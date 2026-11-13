@@ -1,0 +1,8 @@
+﻿SnapshotDate,2025-04-05
+
+ItemCode,ItemName,SupplierName,AvailableStock,WksToOOS
+100000,ItemA,SupplierA,100,25
+100001,ItemB,SupplierA,90,41
+100002,ItemC,SupplierB,300,46
+100003,ItemD,SupplierC,500,23
+100004,ItemE,SupplierC,100,24
