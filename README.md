@@ -1,0 +1,198 @@
+# Multi-agent Purchasing AI Suite
+
+A purchasing-decision pipeline: from a stock CSV and the company's supplier and item history
+documents, it writes an **analysis report** for the purchasing officer (buyer), a **purchase
+request** for the approvers and a **draft email to the supplier**, one set per supplier. Code does the arithmetic,
+retrieval and document assembly; LLMs read the history and write; every draft is checked by code
+and by an LLM judge before the buyer sees it.
+
+> **Portfolio (8 pages):** [English](docs/Purchasing_AI_Suite_en.pdf) · [Korean](docs/Purchasing_AI_Suite_ko.pdf)
+>
+> **One run, end to end:** one supplier's stock CSV and three history documents ([case](dev/cases/meridian_seals_walkthrough.json)), and the analysis report, purchase request and supplier email written from them, as Word and Markdown, with every check's verdict ([run](dev/runs/2026-11-04_162511_walkthrough-example-v2-supplier-wide-lead-time-not/)).
+
+| | |
+|---|---|
+| Code and LLM roles | Code: risk, order dates and quantities, history retrieval, document assembly. LLM: reading the history, judgements, wording |
+| History retrieval | Metadata-based RAG: documents found by their supplier, item and date headers, given to the model whole |
+| Quality checks | 36 checks across the three documents (code and LLM judge); a blocking failure in the analysis, or internal data in the email, is sent back with the reasons for up to two rewrites, and review-only failures are noted in the draft |
+| Model choice | Every agent's model and effort chosen on the same inputs, scored by the checks and with every output reviewed manually (see [Model choice](#model-choice)) |
+| Time and cost | About 80 s and $0.05 for one supplier with seven items, all checks included, no rewrite |
+
+---
+
+## How a run works
+
+<img src="docs/images/pipeline.png" width="100%" alt="The pipeline from the stock CSV to the buyer's drafts: input and retrieval, analysis with code and judge checks and rewrites, documents written and checked in parallel, and the output with run records">
+
+1. **Input.** The buyer exports the stock position from an SAP Business One user query as a CSV and
+   uploads it. The pipeline validates every row and groups the items by supplier, since ordering,
+   negotiation and enquiries all happen per supplier.
+2. **Figures in code.** Risk level from weeks to stockout against the 18-week lead time, latest
+   order and delivery dates, and the suggested quantity (26 weeks of sales after arrival), all
+   counted from the snapshot date ([`docs/stock_figures.md`](docs/stock_figures.md)).
+3. **History in code.** For each supplier and item, the documents of the 12 months before the
+   snapshot, the latest five per scope, matched on their headers.
+4. **Analysis (LLM).** `gpt-6.1-sol` states the facts in the history, each citing its document, and
+   proposes lead-time or quantity changes, questions for the supplier and actions, each citing the
+   facts it rests on. Code recalculates every figure after a proposed change.
+5. **Checks.** Code checks first; then the judge (`claude-haiku-5-5`). A blocking failure sends the
+   analysis back with the reasons, up to two rewrites; if it still fails, the attempt with the
+   fewest blocking failures is used and re-checked.
+6. **Documents.** The analysis report is assembled in code. If anything needs ordering, the
+   purchase request (`gpt-6.1-sol`) is written first; its check then runs in parallel with the
+   supplier email (`gpt-6.1-sol`) and the email's validation. Each agent gets only what it needs: the
+   email input leaves out the stock and risk fields and the questions marked internal.
+7. **Document checks.** The purchase request is checked for added or altered facts; the email is
+   checked for anything internal (code and Haiku, rewritten up to twice) and then for coverage and
+   tone (judge, warnings).
+8. **Output.** Word drafts for the buyer, each with a note at the top listing what is unresolved.
+   The quality-check document and the run record stay on the server for the operator.
+
+### Evidence trail
+
+Source documents are numbered `[1], [2]…`; each fact cites its documents and is numbered
+`[F1], [F2]…`; each proposed change, question and action cites the facts behind it. Facts drawn
+from the stock figures carry no document number and are listed apart. Code checks that every
+citation resolves; the judge checks that each one supports what rests on it.
+
+---
+
+## Quality checks
+
+| Document | Checks | By | On failure |
+|---|---|---|---|
+| Analysis | C1–C10 (format, items, figures, citations, recalculated dates) and J1a–J8 (history stated, not distorted, applied to the right supplier and item; changes justified and sized; supplier questions free of internal data) | Code, LLM judge | Blocking: rewrite (up to 2). Warnings: note in the draft |
+| Purchase request | P1a–c (nothing added, figures as given, meaning kept), P2 (length), P3 (citations) | LLM judge, code | Note in the draft |
+| Supplier email | E1–E3 (no internal data; no past supplier problem, or when it occurred, mentioned directly, while questions about procedures for this order pass; no item outside the order) | Code, Haiku | Rewrite (up to 2), then note |
+| | E4–E7 (every point asked, no repeat, earliest dispatch asked, tone of a request) | LLM judge | Note in the draft |
+
+Definitions: [`docs/eval_rubric.md`](docs/eval_rubric.md). Check ids were renumbered on 29 Oct 2026;
+records written before use the old ids (mapping: `LEGACY_IDS` in `services/quality_checks.py`).
+
+**The judge was validated before use** ([`docs/judge_selection.md`](docs/judge_selection.md)):
+on 51 samples (49 with a fault, 2 without) it caught 93.9% of the faults, with 3.9% of verdicts
+changing between runs, and 8.0% false alarms on 89 hand-scored verdicts of six other outputs.
+Letting Haiku reason before answering raised its detection from 83.7%.
+
+---
+
+## Model choice
+
+Each agent's model was chosen on fixed inputs, scored by the checks above, with every output
+reviewed manually:
+
+| Agent | Chosen | Compared with | Record |
+|---|---|---|---|
+| Analysis | `gpt-6.1-sol`, medium effort | `gpt-4o`, `gpt-6-luna`, `claude-sonnet-5-5`, Gemini Flash (7 models, 9 settings) | [`analysis_model_selection.md`](docs/analysis_model_selection.md) |
+| Judge | `claude-haiku-5-5`, high effort | Haiku without reasoning, Haiku medium, `gpt-6-luna`, Gemini Flash-Lite | [`judge_selection.md`](docs/judge_selection.md) |
+| Purchase request | `gpt-6.1-sol`, low effort | `gpt-4o`, `gpt-5.4-mini`, `gpt-6-luna` at several efforts | [`approval_model_selection.md`](docs/approval_model_selection.md) |
+| Supplier email | `gpt-6.1-sol`, low effort | `gpt-5.4-mini`, `gpt-6-luna` at several efforts | [`email_model_selection.md`](docs/email_model_selection.md) |
+| Email validator | `claude-haiku-5-5`, medium effort | `gpt-4o-mini`, Haiku low and high | [`email_model_selection.md`](docs/email_model_selection.md) |
+
+---
+
+## Self-hosting: measured, not adopted
+
+Gemma 4 12B was served with vLLM on one RTX 5090 and fine-tuned with QLoRA SFT
+([`docs/serving_gemma4_vllm.md`](docs/serving_gemma4_vllm.md),
+[`docs/sft_gemma4.md`](docs/sft_gemma4.md): the training data and what one example is):
+
+- **Serving is feasible:** in FP8 it takes 13.3 GiB (fits one L4), with 1.50–1.84× the throughput of
+  bf16 across 1 to 16 concurrent requests, and a quality difference within run-to-run variation.
+- **The model is not good enough:** on the 25 evaluation cases the untuned model passed every
+  blocking check in 14, against 24 for `gpt-6.1-sol`; every fine-tuned adapter did worse (3–10).
+  Production stays on `gpt-6.1-sol`.
+
+---
+
+## Data protection
+
+- The email input leaves out the stock and risk fields and the questions marked internal; the
+  supplier questions it carries were checked for internal data in the analysis (J5), and the email
+  itself is checked again before it goes out (E1–E3).
+- LangSmith: content hiding is on by default (`langsmith_hide_content`). Prompt and response text is
+  hidden and supplier names are left out of trace names and metadata; timings, token counts, model
+  names and error messages are still sent, and error messages are written to carry no data.
+- Each run is recorded on the company server as JSON (inputs, history used, outputs, checks, times,
+  tokens), with run and check statistics appended to CSV files.
+- All data in this repository is synthetic.
+
+---
+
+## Running it
+
+**Requirements:** Python 3.11, an OpenAI key, an Anthropic key (judge and email validator).
+
+```bash
+git clone https://github.com/soominmyung/purchasing-ai-suite.git
+cd purchasing-ai-suite
+pip install -r requirements.txt
+cp .env.example .env        # set OPENAI_API_KEY, ANTHROPIC_API_KEY, API_ACCESS_TOKEN
+uvicorn main:app --reload   # API docs at http://localhost:8000/docs
+```
+
+Tracing to LangSmith is on in `.env.example`; set `LANGCHAIN_TRACING_V2=false` to run without it. On
+synthetic data, `LANGSMITH_HIDE_CONTENT=false` shows the prompt and response text in the traces.
+
+**Access.** Requests carry the `X-API-Key` header, checked against `API_ACCESS_TOKEN`; with no token
+set, every request passes, so set one wherever others can reach the API. The calls that run the
+models are also limited per client address per day (`RATE_LIMIT_PER_DAY`, default 5, counted in
+memory); behind a proxy, `TRUST_FORWARDED_FOR=true` counts each user rather than the proxy.
+
+Or with Docker: `docker build -t purchasing-ai .` then `docker run -p 8080:8080 --env-file .env purchasing-ai`.
+
+**History documents.** Upload PDFs to `POST /api/ingest/history` (or a ZIP to `/api/ingest/history/zip`).
+Each document starts with header lines that say what it is about: `Supplier:`, `Item:`,
+`ItemCode:`, `Date:`. A supplier only means the whole supplier; supplier and item, that item from
+that supplier; item only, the item whoever supplies it. On the company server, a shared folder is
+kept in sync instead (`/api/ingest/history/folder`).
+
+**Stock CSV.** Upload to `POST /api/run` (or `/api/run/stream` for progress events), with the `X-API-Key`
+header:
+
+```
+SnapshotDate,2025-04-05
+
+ItemCode,ItemName,SupplierName,AvailableStock,WksToOOS
+100000,ItemA,SupplierA,100,25
+```
+
+- `AvailableStock`: on hand + on order − committed (SAP Business One `OITW`).
+- `WksToOOS`: available stock ÷ average weekly sales over the previous four months.
+- The snapshot date comes from the `SnapshotDate` line, or else from a DDMMYY date in the file name
+  (`050425.csv`). A snapshot more than three days old is refused (`max_snapshot_age_days`; the
+  sample's run date is fixed in `config.py` so it passes).
+
+A sample is in [`050425.csv`](050425.csv). Development cases with history documents are in
+[`dev/cases/`](dev/cases/); `python scripts/run_dev_case.py dev/cases/kestrel_components.json --label "…"`
+runs one through the whole pipeline and records it under `dev/runs/`; a sample record of that case:
+[`dev/runs/2026-10-29_004531_judge-checks-renumbered-without-gaps-j3a-c-j4-j8/`](dev/runs/2026-10-29_004531_judge-checks-renumbered-without-gaps-j3a-c-j4-j8/).
+
+**Main settings** (`config.py`, overridable by environment variables): `evaluator_model`,
+`analysis_rewrites`, `history_window_months`, `history_docs_per_scope`,
+`langsmith_hide_content`, `deliver_evaluation_report`. Agent models and efforts are in
+`services/agents.py` (`AGENT_MODELS`, `AGENT_EFFORT`).
+
+---
+
+## Repository
+
+Every file, folder by folder: [`FILES.md`](FILES.md).
+
+| Path | Contents |
+|---|---|
+| `main.py`, `config.py`, `schemas.py` | FastAPI app, settings, request and response models |
+| `routers/` | API: `pipeline` (run), `ingest` (history documents), `output` (downloads) |
+| `services/` | `agents` (LangGraph graph and agents), `quality_checks` (code checks and judge), `documents` (document assembly), `item_grouping` (risk, dates, quantities), `vector_store` and `history_folder` (history store and shared-folder sync), `run_record`, `security` |
+| `utils/` | CSV parsing and validation, PDF reading, Word output |
+| `prompts/` | The prompts in use; each run record stores a SHA-256 of every prompt as loaded and a short hash of the whole set (`prompt_version`), and development runs keep the full text |
+| `scripts/` | Model comparisons, judge validation, dev runs, SFT and serving experiments |
+| `eval_data/`, `eval_results/` | Evaluation scenarios, judge calibration samples and hand scores; raw results of every comparison |
+| `dev/` | Development cases (kept apart from the evaluation set) and two recorded runs |
+| `docs/` | Quality checks, model selection records, serving measurement, portfolio (English and Korean PDFs) |
+| `mcp_servers/` | History and replenishment MCP servers, built and tested but not used in the pipeline |
+
+## Tech stack
+
+Python · FastAPI · LangGraph · LangSmith · OpenAI and Anthropic APIs · ChromaDB · MCP ·
+QLoRA SFT (Unsloth, TRL) · vLLM · Docker · GitHub Actions · GCP Cloud Run
