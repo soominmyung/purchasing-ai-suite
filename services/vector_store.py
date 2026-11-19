@@ -1,88 +1,147 @@
 """
 The history store: one Chroma collection of purchasing history documents, each stored whole
-and retrieved by its header metadata.
+and retrieved by its header metadata. No embedding is computed and nothing is searched by
+similarity: Chroma is used as a document store with metadata filters.
 """
 import re
 import threading
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from langchain_openai import OpenAIEmbeddings
-from langchain_community.vectorstores import Chroma
-from langchain_core.documents import Document
-
-from config import settings
+import chromadb
+from chromadb.config import Settings as ChromaSettings
 
 # Chroma storage path (local directory)
 _CHROMA_DIR = Path(__file__).resolve().parent.parent / "data" / "chroma"
 _CHROMA_DIR.mkdir(parents=True, exist_ok=True)
 
-_stores: dict[str, Chroma] = {}
-_embeddings = None
+# Chroma keeps a vector with every record. Retrieval here is by metadata alone (search_history),
+# so each document gets this one-number placeholder instead of an embedding. Given no vector,
+# Chroma would download an embedding model and embed every document itself.
+_NO_VECTOR = [0.0]
+_BATCH = 1000  # records per write
+
+_history = None
 # Opening the Chroma client from several threads at once fails ("Could not connect to tenant
 # default_tenant", seen 2026-10-24 with four approval calls in parallel): one opener at a time.
 _open_lock = threading.Lock()
 
 
-def _get_embeddings():
-    global _embeddings
-    if _embeddings is None:
-        if not settings.openai_api_key:
-            # Return None gracefully if API key is not set (will error on actual use)
-            return None
-        _embeddings = OpenAIEmbeddings(api_key=settings.openai_api_key)
-    return _embeddings
+def _add(collection, ids: list[str], texts: list[str], metadatas: list[dict[str, Any]]) -> None:
+    for i in range(0, len(ids), _BATCH):
+        part = slice(i, i + _BATCH)
+        collection.add(ids=ids[part], documents=texts[part], metadatas=metadatas[part],
+                       embeddings=[_NO_VECTOR] * len(ids[part]))
 
 
-def _get_or_create_store(collection_name: str) -> Chroma:
+def _fill_unread_dates(collection) -> int:
+    """A document's date is read once, when it is stored, and retrieval uses the stored value. So
+    a document stored without a date is read again here: if its date line can be read now, the
+    date is filled in. A document with no date line stays as it is, placed by the date it was
+    stored. Returns how many dates were filled in."""
+    held = collection.get(include=["metadatas"])
+    undated = [i for i, m in zip(held["ids"], held["metadatas"]) if not (m or {}).get("event_date")]
+    filled = 0
+    for start in range(0, len(undated), _BATCH):
+        rows = collection.get(ids=undated[start:start + _BATCH], include=["documents", "metadatas"])
+        found = [(i, {**(m or {}), "event_date": day})
+                 for i, text, m in zip(rows["ids"], rows["documents"], rows["metadatas"])
+                 if (day := _extract_event_date(text))]
+        if found:
+            collection.update(ids=[i for i, _ in found], metadatas=[m for _, m in found])
+            filled += len(found)
+    return filled
+
+
+def history_collection():
+    """The history collection, opened once, with Chroma's usage telemetry off. On opening, a store
+    written with embeddings is rewritten (its documents and metadata kept, the vectors dropped),
+    and documents stored without a date are read again for one (_fill_unread_dates)."""
+    global _history
     with _open_lock:
-        return _open_store(collection_name)
+        if _history is None:
+            client = chromadb.PersistentClient(path=str(_CHROMA_DIR),
+                                               settings=ChromaSettings(anonymized_telemetry=False))
+            collection = client.get_or_create_collection(HISTORY_COLLECTION, embedding_function=None)
+            held = collection.get(limit=1, include=["embeddings"])["embeddings"]
+            if held is not None and len(held) and len(held[0]) != len(_NO_VECTOR):
+                rows = collection.get(include=["documents", "metadatas"])
+                client.delete_collection(HISTORY_COLLECTION)
+                collection = client.get_or_create_collection(HISTORY_COLLECTION, embedding_function=None)
+                _add(collection, rows["ids"], rows["documents"], rows["metadatas"])
+            _fill_unread_dates(collection)
+            _history = collection
+        return _history
 
 
-def _open_store(collection_name: str) -> Chroma:
-    if collection_name not in _stores:
-        emb = _get_embeddings()
-        if emb is None:
-            # Skip store creation if API key is missing (can retry later)
-            return None
-        _stores[collection_name] = Chroma(
-            collection_name=collection_name,
-            embedding_function=emb,
-            persist_directory=str(_CHROMA_DIR),
-        )
-    return _stores.get(collection_name)
-
-
-def get_vector_stores() -> dict[str, Chroma]:
+def get_vector_stores() -> None:
     """Open the history store at start-up."""
-    _get_or_create_store(HISTORY_COLLECTION)
-    return _stores
+    history_collection()
 
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-_DATE_LINE_RE = re.compile(r"Date:\s*([^\n\r]+)")
-_DATE_FORMATS = ("%Y-%m-%d", "%d %B %Y", "%B %d, %Y")
+# The document's date: its 'Date:' line (also 'Dated:', 'Report date:', 'Document date:',
+# 'Issue date:'), in whichever way the date is written.
+_DATE_LINE_RE = re.compile(r"^\s*(?:(?:Report|Document|Issue)\s+)?Dated?\s*[:\-–]\s*(.+?)\s*$",
+                           re.IGNORECASE | re.MULTILINE)
+_MONTHS = {name: n for n, names in enumerate(
+    ("january jan", "february feb", "march mar", "april apr", "may", "june jun", "july jul", "august aug",
+     "september sep sept", "october oct", "november nov", "december dec"), 1) for name in names.split()}
+_ORDINAL = r"(?:st|nd|rd|th)?"
+_DATE_PATTERNS = (
+    # year first: 2025-04-05, 2025/4/5, 2025.04.05, 2025. 4. 5., 2025년 4월 5일, 20250405
+    ("ymd", re.compile(r"(?<!\d)(\d{4})\s*[-/.년]\s*(\d{1,2})\s*[-/.월]\s*(\d{1,2})(?!\d)")),
+    ("ymd", re.compile(r"(?<!\d)(\d{4})(\d{2})(\d{2})(?!\d)")),
+    # the month as a word: 5 April 2025, 5th Apr 2025, 05-Apr-25; April 5, 2025, Apr 5th 2025
+    ("dmy_name", re.compile(rf"(?<!\d)(\d{{1,2}}){_ORDINAL}[\s\-.]*(?:of\s+)?([A-Za-z]{{3,9}})\.?,?[\s\-.]*(\d{{4}}|\d{{2}})(?!\d)")),
+    ("mdy_name", re.compile(rf"([A-Za-z]{{3,9}})\.?\s*(\d{{1,2}}){_ORDINAL},?\s*(\d{{4}})(?!\d)")),
+    # figures only, day first as dates are written in the UK (and in the stock CSV's file name):
+    # 05/04/2025, 5.4.25. Month first is read only where it cannot be a day (04/25/2025).
+    ("dmy", re.compile(r"(?<!\d)(\d{1,2})\s*[-/.]\s*(\d{1,2})\s*[-/.]\s*(\d{4}|\d{2})(?!\d)")),
+)
+
+
+def read_date(raw: str) -> str:
+    """A written date as an ISO date; "" when the text holds no full date in a form listed above
+    (a month and year alone, a quarter). An unknown form is left unread rather than guessed."""
+    for kind, pattern in _DATE_PATTERNS:
+        for m in pattern.finditer(raw or ""):
+            a, b, c = m.groups()
+            if kind == "ymd":
+                y, mo, d = int(a), int(b), int(c)
+            elif kind == "dmy_name":
+                d, mo, y = int(a), _MONTHS.get(b.lower()), int(c)
+            elif kind == "mdy_name":
+                mo, d, y = _MONTHS.get(a.lower()), int(b), int(c)
+            else:
+                d, mo, y = int(a), int(b), int(c)
+                if mo > 12 >= d:
+                    d, mo = mo, d
+            if not mo:
+                continue
+            y += 2000 if y < 100 else 0
+            try:
+                if 1990 <= y <= 2100:
+                    return datetime(y, mo, d).date().isoformat()
+            except ValueError:
+                continue
+    return ""
 
 
 def _extract_event_date(text: str) -> str:
-    """Parse the document's own 'Date: ...' line (existing report-writing convention) into an ISO date.
-
-    Returns "" if no such line is found or it doesn't match a known format; callers fall back
-    to ingested_at in that case (see _doc_date) rather than mistaking an undated document for old.
+    """The date on the document's own date line, as an ISO date: the first such line that holds a
+    date. Returns "" if there is none; callers fall back to ingested_at in that case (see
+    _doc_date) rather than mistaking an undated document for old.
     """
-    match = _DATE_LINE_RE.search(text)
-    if not match:
-        return ""
-    raw = match.group(1).strip()
-    for fmt in _DATE_FORMATS:
-        try:
-            return datetime.strptime(raw, fmt).date().isoformat()
-        except ValueError:
-            continue
+    for m in _DATE_LINE_RE.finditer(text or ""):
+        found = read_date(m.group(1))
+        if found:
+            return found
     return ""
 
 
@@ -163,24 +222,22 @@ def ingest_history(text: str, source: str = "", origin: str = "upload", fingerpr
     if source:
         delete_history_source(origin, source)
     # stored whole: a history document is at most two pages and is retrieved by its metadata
-    _get_or_create_store(HISTORY_COLLECTION).add_documents(
-        [Document(page_content=text, metadata=history_metadata(header, source, origin, fingerprint))])
+    _add(history_collection(), [uuid.uuid4().hex], [text], [history_metadata(header, source, origin, fingerprint)])
     return header
 
 
 def delete_history_source(origin: str, source: str) -> int:
     """Remove one document. Returns how many entries were removed (0 if it was not held)."""
-    store = _get_or_create_store(HISTORY_COLLECTION)
-    ids = store._collection.get(where={"source_id": f"{origin}:{source}"})["ids"]
+    collection = history_collection()
+    ids = collection.get(where={"source_id": f"{origin}:{source}"})["ids"]
     if ids:
-        store._collection.delete(ids=ids)
+        collection.delete(ids=ids)
     return len(ids)
 
 
 def history_sources(origin: str) -> dict[str, dict[str, str]]:
     """Documents held from one origin: {source: {fingerprint, supplier, items}}."""
-    store = _get_or_create_store(HISTORY_COLLECTION)
-    raw = store._collection.get(where={"origin": origin}, include=["metadatas"])
+    raw = history_collection().get(where={"origin": origin}, include=["metadatas"])
     out: dict[str, dict[str, str]] = {}
     for m in raw.get("metadatas") or []:
         out[m.get("source") or ""] = {"fingerprint": m.get("fingerprint") or "",
@@ -190,7 +247,7 @@ def history_sources(origin: str) -> dict[str, dict[str, str]]:
 
 def known_suppliers() -> set[str]:
     """Normalised names of every supplier named in a history header."""
-    raw = _get_or_create_store(HISTORY_COLLECTION)._collection.get(include=["metadatas"])
+    raw = history_collection().get(include=["metadatas"])
     return {history_key(m.get("supplier_name")) for m in raw.get("metadatas") or [] if m.get("supplier_name")}
 
 
@@ -214,12 +271,20 @@ def _months_before(day: str, months: int) -> str:
 def search_history(supplier: str, items: list[tuple[str, str]], as_of: str,
                    months: int, per_scope: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """
-    History documents for one analysis. A document qualifies when it names this supplier or any
-    of these items (by code or name) and is dated within `months` before `as_of`. Within that,
-    the `per_scope` most recent documents are kept for the supplier (supplier-wide documents and
-    documents about its other items) and for each item; a document in several scopes is kept
-    once. Returns (documents, counts) where counts says how many qualified and how many were
-    left out, for the report.
+    History documents for one analysis. A document qualifies when it names this supplier, or
+    names any of these items (by code or name) and no supplier, and is dated within `months`
+    before `as_of`. Within that, `per_scope` documents are kept for the supplier (the most recent
+    supplier-wide documents and documents about its other items) and for each item: this
+    supplier's documents about it first, the most recent first, and, in the places left, the
+    most recent documents about it that name no supplier. A document in several scopes is kept
+    once. Returns (documents, counts) where counts says how many qualified and how many were left
+    out, for the report.
+
+    A document that names another supplier is about that supplier's goods, even when it names
+    one of these items (the header rule: supplier and items set = those items from that
+    supplier). It is left out before the limits, so it neither takes an item's place from this
+    supplier's documents nor reaches the analysis, whose prompt reads every document naming a
+    supplier and items as this supplier's.
     """
     keys = [f"s:{history_key(supplier)}"] if history_key(supplier) else []
     for code, name in items:
@@ -230,8 +295,7 @@ def search_history(supplier: str, items: list[tuple[str, str]], as_of: str,
     if not keys:
         return [], counts
     where = {keys[0]: True} if len(keys) == 1 else {"$or": [{k_: True} for k_ in keys]}
-    store = _get_or_create_store(HISTORY_COLLECTION)
-    raw = store._collection.get(where=where, include=["metadatas", "documents"])
+    raw = history_collection().get(where=where, include=["metadatas", "documents"])
 
     # one entry per document
     docs: dict[tuple, dict[str, Any]] = {}
@@ -247,14 +311,20 @@ def search_history(supplier: str, items: list[tuple[str, str]], as_of: str,
                      "date": m.get("event_date") or "", "source": m.get("source") or "",
                      "_sort": _doc_date(m), "_keys": {k_ for k_ in m if k_.startswith("i:")},
                      "text": text}
+    # another supplier's documents about these items are not about this order (docstring)
+    own = history_key(supplier)
+    docs = {k: d for k, d in docs.items() if not d["supplier"] or history_key(d["supplier"]) == own}
     counts["matched"] = len(docs)
     start, end = counts["from"], counts["to"]
     pool = sorted((d for d in docs.values() if start < d["_sort"] <= end), key=lambda d: d["_sort"], reverse=True)
     counts["in_window"] = len(pool)
 
     item_keys = [{f"i:{history_key(v)}" for v in (code, name) if history_key(v)} for code, name in items]
-    scopes = [[d for d in pool if not (d["_keys"] & set().union(*item_keys)) and history_key(d["supplier"]) == history_key(supplier)]]
-    scopes += [[d for d in pool if d["_keys"] & ik] for ik in item_keys]
+    scopes = [[d for d in pool if not (d["_keys"] & set().union(*item_keys)) and history_key(d["supplier"]) == own]]
+    # an item's places: this supplier's documents about it first, then those naming no supplier
+    # (each group newest first), so documents about the item in general fill only what is left
+    scopes += [[d for d in pool if d["_keys"] & ik and d["supplier"]] + [d for d in pool if d["_keys"] & ik and not d["supplier"]]
+               for ik in item_keys]
     chosen: list[dict[str, Any]] = []
     for scope in scopes:
         for d in scope[:per_scope]:

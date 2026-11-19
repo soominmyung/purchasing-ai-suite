@@ -22,7 +22,7 @@ os.chdir(ROOT)  # config reads .env from the working directory; an MCP client st
 
 from mcp.server.mcpserver import MCPServer
 
-from services.vector_store import HISTORY_COLLECTION, _get_or_create_store, search_history
+from services.vector_store import history_collection, search_history
 
 mcp = MCPServer(
     name="purchasing-history",
@@ -70,10 +70,7 @@ def purchasing_history(supplier_name: str = "", item_names: list[str] | None = N
 
 
 def _distinct(field: str) -> list[str]:
-    store = _get_or_create_store(HISTORY_COLLECTION)
-    if store is None:  # no OpenAI key: the store cannot be opened
-        return []
-    raw = store._collection.get(include=["metadatas"])
+    raw = history_collection().get(include=["metadatas"])
     values = set()
     for m in raw.get("metadatas") or []:
         values.update(v.strip() for v in str((m or {}).get(field) or "").split(",") if v.strip())

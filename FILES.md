@@ -42,7 +42,7 @@ Every file in the repository, by folder. The overview of the system is in [`READ
 | `quality_checks.py` | The checks: code checks C1–C10, the judge's checks J1a–J8, P1–P3 and E1–E7, their wording and severity |
 | `documents.py` | The documents assembled in code from the analysis: report, purchase request, email; figures after a lead-time change; each agent's input |
 | `item_grouping.py` | Stock rows grouped by supplier; risk level, gap, latest order and delivery dates, suggested quantity ([`docs/stock_figures.md`](docs/stock_figures.md)) |
-| `vector_store.py` | The history store (Chroma): documents kept whole, retrieved by their supplier, item and date headers |
+| `vector_store.py` | The history store (Chroma, used as a document store with metadata filters): documents kept whole, retrieved by their supplier, item and date headers; no embeddings |
 | `history_folder.py` | Keeps the history store in step with a shared folder (new, changed, deleted files) |
 | `prompts.py` | Loads the prompts of the version in use and hashes them for the run record |
 | `run_record.py` | One JSON record per run (inputs, history used, outputs, checks, times, tokens) and the run and check statistics in CSV |

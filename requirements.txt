@@ -12,15 +12,14 @@ anthropic>=1.15.0
 # releases lack; with brotli 1.0.9 every call fails as a connection error.
 brotli>=1.2.0
 
-# LangChain (agents, tools, embeddings)
+# LangChain (agents)
 langchain>=0.1.0
 langchain-openai>=0.0.5
-langchain-community>=0.0.20
 langchain-anthropic>=1.7.6
 # Trying Gemini as an agent model (scripts/run_dev_case.py --analysis-model) needs langchain-google-genai.
 langgraph>=0.0.26
 
-# History store
+# History store (documents and their metadata; no embeddings)
 chromadb>=0.4.22
 
 # PDF extraction

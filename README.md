@@ -13,7 +13,7 @@ and by an LLM judge before the buyer sees it.
 | | |
 |---|---|
 | Code and LLM roles | Code: risk, order dates and quantities, history retrieval, document assembly. LLM: reading the history, judgements, wording |
-| History retrieval | Metadata-based RAG: documents found by their supplier, item and date headers, given to the model whole |
+| History retrieval | Metadata-based RAG: documents found by their supplier, item and date headers, given to the model whole; no embeddings or similarity search |
 | Quality checks | 36 checks across the three documents (code and LLM judge); a blocking failure in the analysis, or internal data in the email, is sent back with the reasons for up to two rewrites, and review-only failures are noted in the draft |
 | Model choice | Every agent's model and effort chosen on the same inputs, scored by the checks and with every output reviewed manually (see [Model choice](#model-choice)) |
 | Time and cost | About 80 s and $0.05 for one supplier (five to seven items), all checks included: 79–85 s in four runs with no rewrite; one analysis rewrite takes it to about 130 s and $0.09 |
@@ -31,7 +31,9 @@ and by an LLM judge before the buyer sees it.
    order and delivery dates, and the suggested quantity (26 weeks of sales after arrival), all
    counted from the snapshot date ([`docs/stock_figures.md`](docs/stock_figures.md)).
 3. **History in code.** For each supplier and item, the documents of the 12 months before the
-   snapshot, the latest five per scope, matched on their headers.
+   snapshot, five per scope, matched on their headers: for the supplier, the latest five about
+   it as a whole or its other items; for an item, the supplier's own documents about it first,
+   then, in the places left, the latest about the item from no named supplier.
 4. **Analysis (LLM).** `gpt-6.1-sol` states the facts in the history, each citing its document, and
    proposes lead-time or quantity changes, questions for the supplier and actions, each citing the
    facts it rests on. Code recalculates every figure after a proposed change.
@@ -120,6 +122,9 @@ Gemma 4 12B was served with vLLM on one RTX 5090 and fine-tuned with QLoRA SFT
   names are still sent.
 - Each run is recorded on the company server as JSON (inputs, history used, outputs, checks, times,
   tokens), with run and check statistics appended to CSV files.
+- History documents are stored with their header metadata only (`services/vector_store.py`): no
+  embedding is computed, so their text goes to no embedding service, and the store's own usage
+  telemetry is off.
 - All data in this repository is synthetic.
 
 ---
@@ -149,8 +154,13 @@ Or with Docker: `docker build -t purchasing-ai .` then `docker run -p 8080:8080 
 **History documents.** Upload PDFs to `POST /api/ingest/history` (or a ZIP to `/api/ingest/history/zip`).
 Each document starts with header lines that say what it is about: `Supplier:`, `Item:`,
 `ItemCode:`, `Date:`. A supplier only means the whole supplier; supplier and item, that item from
-that supplier; item only, the item whoever supplies it. On the company server, a shared folder is
-kept in sync instead (`/api/ingest/history/folder`).
+that supplier; item only, the item whoever supplies it. So a supplier's analysis gets its own
+documents and those about its items whoever supplies them, never a document naming another
+supplier, even about the same item. Names and codes match whatever their capitals, spacing and
+punctuation (`Meridian Seals` and `MERIDIAN-SEALS` are one supplier). The date is read in the usual
+written forms (`2025-04-05`, `5 April 2025`, `5 Apr 2025`, `April 5, 2025`, `05/04/2025`,
+`2025.04.05`); figures alone are read day first, as in the UK. On the company server, a shared
+folder is kept in sync instead (`/api/ingest/history/folder`).
 
 **Stock CSV.** Upload to `POST /api/run` (or `/api/run/stream` for progress events), with the `X-API-Key`
 header:
