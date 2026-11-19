@@ -45,7 +45,7 @@ What each wrote, in the approvers' text:
 - **`gpt-4o`** added its own assessment of the supplier ("a proven track record, supporting the
   decision to proceed with this supplier") in 8 of 25 and got figures wrong ("stockout in 8 weeks"
   for 12). Its P2 fails (13 of 25) also showed it ignoring the length rule.
-- **`gpt-5.4-mini`** kept the length rule best but wrote this tool's terms ("the dates shown in the
+- **`gpt-5.4-mini`** kept the length rule (24 of 25; Sol 25 of 25) but wrote this tool's terms ("the dates shown in the
   pipeline"), false statements ("the revised order dates and quantities" where nothing was revised),
   citations to documents that do not exist ([3], [4] with two given) and empty placeholders ("[ ]").
   More effort made it worse. The metrics alone pointed to it; reading the texts ruled it out.
@@ -122,8 +122,8 @@ the round-5 reading (`eval_results/approval_model_judged_timing.md`) gave 0, as 
 
 ## 4. What each round showed
 
-- **Round 1: the metrics and the texts disagreed.** `gpt-5.4-mini` kept the sentence-length rule best
-  (24 of 25) and `gpt-4o` worst (13); read, `gpt-5.4-mini` put "the dates shown in the pipeline",
+- **Round 1: the metrics and the texts disagreed.** `gpt-5.4-mini` kept the sentence-length rule in
+  24 of 25 (Sol 25, `gpt-4o` 13); read, `gpt-5.4-mini` put "the dates shown in the pipeline",
   "the revised order dates" (nothing was revised) and "[ ]" into the approvers' text, and `gpt-4o`
   added "a proven track record, supporting the decision to proceed with this supplier". Sol carried
   the facts over cleanly.

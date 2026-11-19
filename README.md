@@ -16,7 +16,7 @@ and by an LLM judge before the buyer sees it.
 | History retrieval | Metadata-based RAG: documents found by their supplier, item and date headers, given to the model whole |
 | Quality checks | 36 checks across the three documents (code and LLM judge); a blocking failure in the analysis, or internal data in the email, is sent back with the reasons for up to two rewrites, and review-only failures are noted in the draft |
 | Model choice | Every agent's model and effort chosen on the same inputs, scored by the checks and with every output reviewed manually (see [Model choice](#model-choice)) |
-| Time and cost | About 80 s and $0.05 for one supplier with seven items, all checks included, no rewrite |
+| Time and cost | About 80 s and $0.05 for one supplier (five to seven items), all checks included: 79–85 s in four runs with no rewrite; one analysis rewrite takes it to about 130 s and $0.09 |
 
 ---
 
@@ -38,10 +38,12 @@ and by an LLM judge before the buyer sees it.
 5. **Checks.** Code checks first; then the judge (`claude-haiku-5-5`). A blocking failure sends the
    analysis back with the reasons, up to two rewrites; if it still fails, the attempt with the
    fewest blocking failures is used and re-checked.
-6. **Documents.** The analysis report is assembled in code. If anything needs ordering, the
-   purchase request (`gpt-6.1-sol`) is written first; its check then runs in parallel with the
-   supplier email (`gpt-6.1-sol`) and the email's validation. Each agent gets only what it needs: the
-   email input leaves out the stock and risk fields and the questions marked internal.
+6. **Documents.** The analysis report is assembled in code. If anything needs ordering, two
+   branches then run side by side, each a graph of its own so that neither waits for the other: the
+   purchase request (`gpt-6.1-sol`) and its check, and the supplier email (`gpt-6.1-sol`) with its
+   validation and check. The email is built from the analysis and code's figures, not from the
+   purchase request. Each agent gets only what it needs: the email input leaves out the stock and
+   risk fields and the questions marked internal.
 7. **Document checks.** The purchase request is checked for added or altered facts; the email is
    checked for anything internal (code and Haiku, rewritten up to twice) and then for coverage and
    tone (judge, warnings).

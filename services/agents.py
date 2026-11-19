@@ -545,43 +545,78 @@ def email_check_node(state: PurchasingState):
 # Build the graph.
 # The analysis is checked, and rewritten on a blocking failure (code or judge), before any
 # document is written, so the documents come only from an analysis that passed or used up its
-# rewrites. The documents are one node of the main graph, a graph of their own inside it
-# (report, then the purchase request, then its check beside the email steps).
+# rewrites. The documents are one node of the main graph, a graph of their own inside it: the
+# report, then the purchase request and the supplier email side by side.
 
-# The documents: report, then the purchase request, then its check beside the email steps.
+# Each branch is a graph of its own, run as one node. LangGraph runs a graph in steps, and a step
+# ends only when every node in it has finished, so two branches laid side by side in one graph wait
+# for each other at every step (measured 2026-11-18: about 30 s for the documents, as when the
+# email waited for the purchase request). As one node each, the documents take as long as the
+# longer branch. The email's input comes from the analysis and code's figures, not from the
+# purchase request, so neither branch needs the other.
+
+# The purchase request and its check
+pr_flow = StateGraph(PurchasingState)
+pr_flow.add_node("approval", instrument("approval", approval_node))
+pr_flow.add_node("approval_check", instrument("approval_check", approval_check_node))
+pr_flow.set_entry_point("approval")
+pr_flow.add_edge("approval", "approval_check")
+pr_flow.add_edge("approval_check", END)
+pr_graph = pr_flow.compile()
+
+# The supplier email: the draft, the validator (a fail sends it back to be rewritten), the
+# assembly in code and the judge's check
+email_flow = StateGraph(PurchasingState)
+email_flow.add_node("email_draft", instrument("email_draft", email_draft_node))
+email_flow.add_node("validator", instrument("validator", validator_node))
+email_flow.add_node("email_doc", instrument("email_doc", email_doc_node))
+email_flow.add_node("email_check", instrument("email_check", email_check_node))
+email_flow.set_entry_point("email_draft")
+email_flow.add_edge("email_draft", "validator")
+email_flow.add_conditional_edges("validator", should_continue, {"email_draft": "email_draft", "email_doc": "email_doc"})
+email_flow.add_edge("email_doc", "email_check")
+email_flow.add_edge("email_check", END)
+email_graph = email_flow.compile()
+
+PR_KEYS = ("approval", "approval_input", "pr_md", "approval_check")
+EMAIL_KEYS = ("email_text", "email_md", "email_check", "iteration_count", "correction_feedback", "is_valid_email")
+ADDED_KEYS = ("document_issues", "validation_log")  # lists both branches add to
+
+
+def branch(graph, keys: tuple[str, ...]):
+    """A branch run as one node. It hands back only the keys it writes and, of the lists both
+    branches add to, only its own additions: a subgraph returns the whole state, and two branches
+    writing the same key in one step would conflict."""
+    def run(state: PurchasingState):
+        out = graph.invoke(state)
+        update = {k: out[k] for k in keys if k in out}
+        for k in ADDED_KEYS:
+            added = (out.get(k) or [])[len(state.get(k) or []):]
+            if added:
+                update[k] = added
+        return update
+    return run
+
+
 documents_flow = StateGraph(PurchasingState)
 documents_flow.add_node("report", instrument("report", report_node))
-documents_flow.add_node("approval", instrument("approval", approval_node))
-documents_flow.add_node("approval_check", instrument("approval_check", approval_check_node))
-documents_flow.add_node("email_draft", instrument("email_draft", email_draft_node))
-documents_flow.add_node("validator", instrument("validator", validator_node))
-documents_flow.add_node("email_doc", instrument("email_doc", email_doc_node))
-documents_flow.add_node("email_check", instrument("email_check", email_check_node))
+documents_flow.add_node("purchase_request", branch(pr_graph, PR_KEYS))
+documents_flow.add_node("email", branch(email_graph, EMAIL_KEYS))
 documents_flow.set_entry_point("report")
 
 
-def after_report(state: PurchasingState) -> str:
+def after_report(state: PurchasingState) -> str | list[str]:
     """Every item still Low after the analysis: the run ends with the analysis report, whose Summary
-    says so; no purchase request, check or email (2026-10-25)."""
-    return "approval" if documents.items_to_request(state["items"], state["analysis_output"],
-                                                    state["snapshot_date"]) else "end"
+    says so; no purchase request, check or email (2026-10-25). Otherwise both branches start."""
+    if not documents.items_to_request(state["items"], state["analysis_output"], state["snapshot_date"]):
+        return "end"
+    return ["purchase_request", "email"]
 
 
-documents_flow.add_conditional_edges("report", after_report, {"approval": "approval", "end": END})
-documents_flow.add_edge("approval", "email_draft")
-documents_flow.add_edge("approval", "approval_check")
-documents_flow.add_edge("email_draft", "validator")
-documents_flow.add_conditional_edges(
-    "validator",
-    should_continue,
-    {
-        "email_draft": "email_draft",
-        "email_doc": "email_doc",
-    }
-)
-documents_flow.add_edge("email_doc", "email_check")
-documents_flow.add_edge("email_check", END)
-documents_flow.add_edge("approval_check", END)
+documents_flow.add_conditional_edges("report", after_report,
+                                     {"purchase_request": "purchase_request", "email": "email", "end": END})
+documents_flow.add_edge("purchase_request", END)
+documents_flow.add_edge("email", END)
 documents_graph = documents_flow.compile()
 
 # What the documents step hands back to the main graph
