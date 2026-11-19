@@ -273,12 +273,13 @@ def search_history(supplier: str, items: list[tuple[str, str]], as_of: str,
     """
     History documents for one analysis. A document qualifies when it names this supplier, or
     names any of these items (by code or name) and no supplier, and is dated within `months`
-    before `as_of`. Within that, `per_scope` documents are kept for the supplier (the most recent
-    supplier-wide documents and documents about its other items) and for each item: this
-    supplier's documents about it first, the most recent first, and, in the places left, the
-    most recent documents about it that name no supplier. A document in several scopes is kept
-    once. Returns (documents, counts) where counts says how many qualified and how many were left
-    out, for the report.
+    before `as_of`. Within that, the `per_scope` most recent documents are kept in each scope:
+    one for the supplier (supplier-wide documents and documents about its other items) and two
+    for each item, apart, so that neither takes the other's places: this supplier's documents
+    about the item, and documents about the item that name no supplier (demand, the market). A
+    scope with fewer documents gives those it has. A document in several scopes is kept once.
+    Returns (documents, counts) where counts says how many qualified and how many were left out,
+    for the report.
 
     A document that names another supplier is about that supplier's goods, even when it names
     one of these items (the header rule: supplier and items set = those items from that
@@ -321,10 +322,11 @@ def search_history(supplier: str, items: list[tuple[str, str]], as_of: str,
 
     item_keys = [{f"i:{history_key(v)}" for v in (code, name) if history_key(v)} for code, name in items]
     scopes = [[d for d in pool if not (d["_keys"] & set().union(*item_keys)) and history_key(d["supplier"]) == own]]
-    # an item's places: this supplier's documents about it first, then those naming no supplier
-    # (each group newest first), so documents about the item in general fill only what is left
-    scopes += [[d for d in pool if d["_keys"] & ik and d["supplier"]] + [d for d in pool if d["_keys"] & ik and not d["supplier"]]
-               for ik in item_keys]
+    # two scopes of their own for each item: this supplier's documents about it, and documents
+    # about it that name no supplier
+    for ik in item_keys:
+        scopes += [[d for d in pool if d["_keys"] & ik and d["supplier"]],
+                   [d for d in pool if d["_keys"] & ik and not d["supplier"]]]
     chosen: list[dict[str, Any]] = []
     for scope in scopes:
         for d in scope[:per_scope]:

@@ -509,7 +509,8 @@ def render_analysis_report(supplier: str, snapshot_date: str, items: list[dict],
     out += ["## Referenced Documents", ""]
     if window:
         rule = (f"History searched: documents dated {window['from']} to {window['to']} "
-                f"(last {window['window_months']} months), at most {window['per_scope']} per supplier and per item.")
+                f"(last {window['window_months']} months), at most {window['per_scope']} about the supplier and, for each "
+                f"item, {window['per_scope']} from the supplier and {window['per_scope']} that name no supplier.")
         if window.get("left_out"):
             rule += (f" {window['in_window']} documents fell in that period; the {window['left_out']} oldest "
                      "beyond that limit are not included.")
