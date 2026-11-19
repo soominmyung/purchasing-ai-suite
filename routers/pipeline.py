@@ -32,7 +32,7 @@ from utils.docx_utils import (
 )
 from services.item_grouping import group_by_supplier_and_recommend, screen_rows
 from services.agents import (
-    AGENT_MODELS,
+    agents_used,
     purchasing_graph,
 )
 from services.run_record import RunRecord, client_ip
@@ -49,7 +49,7 @@ def _run_pipeline(
     ip: str = "unknown",
 ) -> RunPipelineResponse:
     """Run the pipeline and keep a run record (services/run_record.py), also when it fails."""
-    record = RunRecord(csv_content, csv_filename or "", ip, AGENT_MODELS)
+    record = RunRecord(csv_content, csv_filename or "", ip, agents_used())
     try:
         response = _run_pipeline_inner(csv_content, csv_filename, progress_callback, embed_files, record)
     except Exception as e:

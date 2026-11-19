@@ -246,7 +246,7 @@ Kept apart from the evaluation set: used to work on the prompts and the pipeline
 | `cases/lowfield_all_low.json` | Every item Low: only the analysis report is written |
 | `cases/meridian_seals_walkthrough.json` | A short worked example of one run: a four-week lead-time notice that raises two items' risk, and a customs hold since fixed that the email must not mention directly |
 
-Two recorded runs, with the same files: the Kestrel case, `runs/2026-10-29_004531_judge-checks-renumbered-without-gaps-j3a-c-j4-j8/`, and the MeridianSeals worked example, `runs/2026-11-04_162511_walkthrough-example-v2-supplier-wide-lead-time-not/`:
+Two recorded runs, with the same files: the Kestrel case, `runs/2026-11-19_115421_kestrel-sample-one-record-entry-per-agent/`, and the MeridianSeals worked example, `runs/2026-11-19_115421_walkthrough-sample-one-record-entry-per-agent/`:
 
 | File | What it is |
 |---|---|

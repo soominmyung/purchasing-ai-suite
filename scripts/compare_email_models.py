@@ -47,7 +47,7 @@ CONFIGS = [("gpt-5.4-mini", "none"), ("gpt-5.4-mini", "low"),
 PRICES = {"gpt-5.4-mini": (0.75, 4.50), "gpt-6-luna": (0.10, 0.50), "gpt-6.1-sol": (2.00, 10.00),
           "gpt-4o-mini": (0.15, 0.60)}
 MAX_DRAFTS = 3  # as agents.should_continue
-JUDGE = settings.evaluator_model
+JUDGE = agents.judge_for("email_judge")
 REPS = 3
 
 # The judge's checks, from the email prompt's rules (2026-10-25; second wording

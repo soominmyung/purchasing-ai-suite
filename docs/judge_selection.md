@@ -87,7 +87,8 @@ also failed a plain summary of a document. With the kept wording: caught 3/3, th
 ## 6. Decision
 
 **`claude-haiku-5-5`, thinking at high effort, answer in the scoring sheet's shape, one call per
-output** (`anthropic:claude-haiku-5-5?effort=high&format=schema`, `evaluator_model` in `config.py`).
+output** (in `config.py`: `judge_model` `claude-haiku-5-5`, `judge_effort` `high`, `judge_output`
+`schema`).
 
 **Why Haiku with thinking: it catches the most faults with the fewest flips.** 93.9% of the seeded
 faults (against 83.7% for the same model forced to answer without thinking and 89.1% for Luna), flip

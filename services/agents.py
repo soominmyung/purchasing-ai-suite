@@ -34,7 +34,7 @@ from services.prompts import (
 )
 from services.quality_checks import (
     BLOCKING, CHECK_NAMES, SEVERITY, approval_checks, approval_markdown, code_checks, email_checks, email_markdown,
-    evaluate_analysis, evaluation_markdown,
+    evaluate_analysis, evaluation_markdown, judge_spec,
 )
 from services.run_record import instrument
 
@@ -55,7 +55,11 @@ AGENT_MODELS = {
     # chosen 2026-10-25 over gpt-4o-mini (docs/email_model_selection.md, The validator): of another family
     # than the email writer; caught every fault in 239 test emails and failed none of Sol's
     "email_validator": "claude-haiku-5-5",
-    "judge": settings.evaluator_model,
+    # The judge, one call per output, all three with the settings in config.py (judge_model,
+    # judge_effort, judge_output)
+    "analysis_judge": settings.judge_model,
+    "approval_judge": settings.judge_model,
+    "email_judge": settings.judge_model,
 }
 # Reasoning effort per agent, set explicitly so a change of API default cannot change a run unseen
 # (2026-10-24: the model comparisons until then ran on defaults, which differ by model: medium on
@@ -67,7 +71,35 @@ AGENT_EFFORT = {
     "email_draft": "low",
     "email_rewrite": "low",
     "email_validator": "medium",
+    "analysis_judge": settings.judge_effort,
+    "approval_judge": settings.judge_effort,
+    "email_judge": settings.judge_effort,
 }
+# How each judge returns its verdicts ("schema": one JSON object shaped like the scoring sheet)
+JUDGE_OUTPUT = {
+    "analysis_judge": settings.judge_output,
+    "approval_judge": settings.judge_output,
+    "email_judge": settings.judge_output,
+}
+
+
+def judge_for(role: str) -> str:
+    """One judge's model, effort and output form, as services/quality_checks.run_judge takes them."""
+    return judge_spec(AGENT_MODELS[role], AGENT_EFFORT.get(role), JUDGE_OUTPUT.get(role))
+
+
+def judge_label(role: str) -> str:
+    """One judge as the quality-check document names it."""
+    effort = AGENT_EFFORT.get(role)
+    return f"`{AGENT_MODELS[role]}`" + (f" (effort {effort})" if effort else "")
+
+
+def agents_used() -> dict[str, dict[str, Any]]:
+    """Each agent's model and effort, and each judge's output form: one entry per agent, recorded
+    with every run (services/run_record.py, scripts/run_dev_case.py)."""
+    return {role: {"model": model, "effort": AGENT_EFFORT.get(role),
+                   **({"output": JUDGE_OUTPUT[role]} if role in JUDGE_OUTPUT else {})}
+            for role, model in AGENT_MODELS.items()}
 
 
 def _llm(model: str = "gpt-4o", effort: str | None = None):
@@ -262,9 +294,9 @@ def run_evaluation_agent(
     Returns (report markdown, structured result).
     """
     result = evaluate_analysis(supplier, items, analysis_output, history_docs or [],
-                               judge=settings.evaluator_model, snapshot_date=snapshot_date,
+                               judge=judge_for("analysis_judge"), snapshot_date=snapshot_date,
                                retries=settings.judge_retries)
-    return evaluation_markdown(supplier, result), result
+    return evaluation_markdown(supplier, result, judge=judge_label("analysis_judge")), result
 # ----- LangGraph Implementation -----
 
 class PurchasingState(TypedDict):
@@ -432,7 +464,7 @@ def approval_check_node(state: PurchasingState):
     problems = [p.removeprefix("purchase request: ") for p in state.get("document_issues") or []
                 if p.startswith("purchase request: ")]
     result = approval_checks(state.get("approval_input") or {}, state["approval"], problems,
-                             judge=settings.evaluator_model, retries=settings.judge_retries)
+                             judge=judge_for("approval_judge"), retries=settings.judge_retries)
     return {"approval_check": result}
 
 def finish_node(state: PurchasingState):
@@ -448,7 +480,8 @@ def finish_node(state: PurchasingState):
         state.get("pr_md") or "", [state.get("evaluation_result") or {}, state.get("approval_check") or {}])
         if state.get("pr_md") else ""}  # no purchase request when every item is still Low
     if state.get("evaluation_result"):
-        md = evaluation_markdown(state["supplier"], state["evaluation_result"], run_id=state.get("run_id") or "",
+        md = evaluation_markdown(state["supplier"], state["evaluation_result"], judge=judge_label("analysis_judge"),
+                                 run_id=state.get("run_id") or "",
                                  snapshot_date=state.get("snapshot_date") or "",
                                  attempts=state.get("analysis_attempts") or [],
                                  used_attempt=state.get("analysis_used_attempt"))
@@ -540,7 +573,7 @@ def email_check_node(state: PurchasingState):
     the email's draft note, no rewrite (2026-10-29). The validator's E1-E3 come first."""
     payload = documents.email_input(state["snapshot_date"], state["supplier"], state["items"], state["analysis_output"])
     requests = documents.email_parts(state.get("email_text") or "")[0]["requests"]
-    return {"email_check": email_checks(payload, requests, judge=settings.evaluator_model, retries=settings.judge_retries)}
+    return {"email_check": email_checks(payload, requests, judge=judge_for("email_judge"), retries=settings.judge_retries)}
 
 # Build the graph.
 # The analysis is checked, and rewritten on a blocking failure (code or judge), before any

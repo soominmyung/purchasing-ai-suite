@@ -636,7 +636,7 @@ def _judge_call(provider: str, model: str, system: str, user: str, checks: list[
     and token usage, under the evaluation node that made it."""
     text, usage = PROVIDERS[provider](model, system, user, checks, **(options or {}))
     from services.run_record import note_usage  # the judge's tokens, in the run record
-    note_usage(f"{provider}:{model}", usage["input_tokens"], usage["output_tokens"])
+    note_usage(model, usage["input_tokens"], usage["output_tokens"])  # named as the agents' models are
     return {"output": text, "usage_metadata": usage}
 
 
@@ -650,6 +650,18 @@ def _verdict_from_text(text: str) -> dict:
         f = re.search(r'"' + name + r'"\s*:\s*"(.*?)"\s*(?:,\s*"(?:pass|note|evidence)"|\}\s*$)', text, re.S)
         return f.group(1) if f else ""
     return {"pass": m.group(1) == "true", "evidence": field("evidence") or text[:300], "note": field("note")}
+
+
+def judge_spec(model: str, effort: str | None = None, output: str | None = None) -> str:
+    """run_judge's spec for a model named as the agents' models are (services/agents.py), the
+    provider read from the name: claude-haiku-5-5, effort high, output schema ->
+    "anthropic:claude-haiku-5-5?effort=high&format=schema". A name with its provider passes as given."""
+    if ":" not in model:
+        provider = ("anthropic" if model.startswith("claude-") else
+                    "gemini" if model.startswith("gemini-") else "openai")
+        model = f"{provider}:{model}"
+    query = "&".join(f"{k}={v}" for k, v in (("effort", effort), ("format", output)) if v)
+    return model + (f"?{query}" if query else "")
 
 
 @traceable(run_type="chain", name="Judge")
@@ -734,7 +746,7 @@ def approval_checks(payload: dict[str, Any], approval: dict[str, Any], citation_
     judged = run_judge(judge, prompt, list(_P1_TEXT), retries=retries)
     results = {**{c: {"pass": v["pass"], "detail": v["evidence"], "note": v.get("note", "")}
                   for c, v in judged.items()}, **results}
-    return {**verdict(results), "checks": results, "judge": judge}
+    return {**verdict(results), "checks": results}
 
 
 def approval_markdown(result: dict[str, Any]) -> str:
@@ -781,7 +793,22 @@ def email_checks(payload: dict[str, Any], requests: str, judge: str, retries: in
               '"note": "<only if it fails: one plain sentence for the buyer>"}, ...} with one entry per check.')
     judged = run_judge(judge, prompt, list(_E_TEXT), retries=retries)
     results = {c: {"pass": v["pass"], "detail": v["evidence"], "note": v.get("note", "")} for c, v in judged.items()}
-    return {**verdict(results), "checks": results, "judge": judge}
+    return {**verdict(results), "checks": results}
+
+
+def judge_prompt_texts() -> dict[str, str]:
+    """The fixed text of the judges' prompts, recorded with every run as the prompt files are
+    (services/prompts.py): the system prompt the three judges share, and each judge's checks as
+    its prompt lists them. The analysis judge is given those that apply to the run, with {unused}
+    filled in per run, and J2a and J2b in their production form."""
+    analysis: dict[str, str] = {}
+    for c, t in _JUDGE_TEXT.items():
+        if c == "J2c":
+            analysis.update(_J2_UNLABELLED)
+        analysis[c] = t
+    listed = lambda texts: "\n".join(f"- {c}: {t}" for c, t in texts.items())  # noqa: E731
+    return {"judge_system": JUDGE_SYSTEM, "analysis_judge_checks": listed(analysis),
+            "approval_judge_checks": listed(_P1_TEXT), "email_judge_checks": listed(_E_TEXT)}
 
 
 def email_markdown(result: dict[str, Any], validator_passed: bool | None, drafts: int) -> str:
@@ -812,7 +839,7 @@ def evaluate_analysis(supplier: str, items: list[dict[str, Any]], analysis: Any,
     results = {**{k: {"pass": v["pass"], "detail": v["detail"]} for k, v in code.items()},
                **{k: {"pass": v["pass"], "detail": v["evidence"], "note": v.get("note", "")}
                   for k, v in judged.items()}}
-    return {**verdict(results), "checks": results, "judge": judge}
+    return {**verdict(results), "checks": results}
 
 
 def verdict(results: dict[str, dict[str, Any]]) -> dict[str, Any]:
@@ -844,17 +871,19 @@ def checks_table(result: dict[str, Any], names: dict[str, str]) -> str:
     return "| Check | Severity | Result | Reason |\n| --- | --- | --- | --- |\n" + "\n".join(rows) + "\n"
 
 
-def evaluation_markdown(supplier: str, result: dict[str, Any], run_id: str = "", snapshot_date: str = "",
-                        attempts: list[dict] | None = None, used_attempt: int | None = None) -> str:
+def evaluation_markdown(supplier: str, result: dict[str, Any], judge: str = "", run_id: str = "",
+                        snapshot_date: str = "", attempts: list[dict] | None = None,
+                        used_attempt: int | None = None) -> str:
     """The quality-check document: a checklist with the reason for each result, the run it belongs
-    to, and how the analysis got there (each attempt, what failed, whether it was sent back)."""
+    to, and how the analysis got there (each attempt, what failed, whether it was sent back).
+    judge: the analysis judge as the document names it (services/agents.judge_label)."""
     head = ["# Analysis Quality Check", "", f"**Supplier:** {supplier}  "]
     if run_id:
         head.append(f"**Run id:** {run_id}  ")
     if snapshot_date:
         head.append(f"**Snapshot date:** {snapshot_date}  ")
     head += [f"**Result:** {verdict_sentence(result)}  ",
-             f"**Checked by:** code, and `{result['judge']}` for the judgement checks", ""]
+             f"**Checked by:** code" + (f", and {judge} for the judgement checks" if judge else ""), ""]
     if attempts:
         head += ["## Attempts", "", "| Attempt | Judge run | Blocking checks failed | Sent back for a rewrite |",
                  "| --- | --- | --- | --- |"]

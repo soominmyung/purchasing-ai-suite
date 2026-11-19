@@ -6,7 +6,7 @@ Report date: 2025-04-06
 
 ## Summary
 
-BearingCap and ThrustWasher are Critical, with gaps of 10 and 2 weeks respectively; arrange shortage cover immediately. ValveSeat also requires ordering on 5 April 2025. The supplier's plant move extends all lead times to 22 weeks, bringing purchasing deadlines forward. Confirm delivery commitments alongside immediate orders and before later orders. GasketKit demand is reported 50% higher, but the market is unspecified; establish UK relevance and whether the contract is already included before changing its quantity.
+BearingCap and ThrustWasher are Critical, with a longest gap of 10 weeks; both need immediate replenishment orders and bridging supply. ValveSeat also requires ordering on 5 April 2025. KestrelComponents' plant move extends the planning lead time to 22 weeks for every item and brings all latest order dates forward. Confirm delivery commitments alongside urgent orders. GasketKit demand is reported 50% higher under a contract through 2027, but establish the market and whether the increase is already included before changing its quantity.
 
 ## Items
 
@@ -28,35 +28,37 @@ BearingCap and ThrustWasher are Critical, with gaps of 10 and 2 weeks respective
 
 ### From the documents
 
-F1. KestrelComponents — announced that lead times for all products would increase by four weeks from 1 April 2025 during its move to a new plant in Gdansk. It expects the longer lead times to last until the end of 2025. [1]
-F2. GasketKit — demand has been 50% higher since January 2025 following a fleet operator's contract for monthly deliveries running until December 2027. The document does not identify the market. [2]
+F1. KestrelComponents — announced that lead times for all products would increase by four weeks from 1 April 2025 during its production move to Gdansk, with the longer lead times expected to last until the end of 2025. [1]
+F2. GasketKit — demand has been 50% higher since January 2025 following a fleet operator's contract for monthly deliveries through December 2027. [2]
 F3. OilSeal — demand has been steady over the past year. [3]
 
 ### From the stock figures (after the proposed changes)
 
 F4. BearingCap — has 12 weeks to stockout against a revised lead time of 22 weeks, leaving a 10-week gap. Its latest order date is 5 April 2025.
-F5. ThrustWasher — has 20 weeks to stockout against a revised lead time of 22 weeks, leaving a 2-week gap. Its latest order date is 5 April 2025.
+F5. ThrustWasher — has 20 weeks to stockout against a revised lead time of 22 weeks, leaving a two-week gap. Its latest order date is 5 April 2025.
 F6. ValveSeat — has 22 weeks to stockout, equal to its revised lead time, with no gap. Its latest order date is 5 April 2025.
+F7. GasketKit — has 24 weeks to stockout against a revised lead time of 22 weeks, with no gap. Its latest order date is 19 April 2025.
 
 ## Critical Questions
 
 Ask KestrelComponents:
-1. How will the plant move affect availability and firm delivery dates for BearingCap, ValveSeat, GasketKit, PistonRing, OilSeal, ThrustWasher and SpringClip in this order? [F1]
-2. What expedited shipping or earlier partial deliveries can you offer for BearingCap and ThrustWasher, and on what dates? [F1, F4, F5]
+1. What expedited or partial deliveries can you offer for BearingCap and ThrustWasher, and what are the earliest firm delivery dates? [F4, F5]
+2. How will the plant move affect production allocation and committed delivery dates for BearingCap, ValveSeat, GasketKit, PistonRing, OilSeal, ThrustWasher and SpringClip in this order? [F1]
 Check internally:
-3. Does the reported GasketKit demand increase relate to the UK market, and, if so, is the fleet contract already reflected in the suggested quantity of 5200? [F2]
+3. Does the reported GasketKit demand increase relate to the UK market, and, if so, is the fleet contract already included in the suggested quantity of 5200? [F2]
 
 ## Proposals
 
-1. Lead time, KestrelComponents overall (expected): ==18 → 22 weeks==: The announced production-move extension applies to all products and is currently in force, so it is added to the standard total lead time. [F1]
-2. Lead time, BearingCap, ValveSeat, GasketKit, PistonRing, OilSeal, ThrustWasher, SpringClip: ==18 → 22 weeks==: The supplier's announced extension applies to every product during the plant move. No item-specific exception or additional delay is documented. [F1]
+1. Lead time, KestrelComponents overall (expected): ==18 → 22 weeks==: The announced production-move extension applies to all products and to orders placed during the stated period; it is added to the existing total lead time, retaining the internal allowance. [F1]
+2. Lead time, BearingCap, ValveSeat, GasketKit, PistonRing, OilSeal, ThrustWasher, SpringClip: ==18 → 22 weeks==: The supplier-wide production-move extension applies to every item, with no item-specific exception or additional delay documented. All revised latest order dates fall within the announced extension period. [F1]
 
 ## Recommended Actions
 
-1. Place the BearingCap, ThrustWasher and ValveSeat orders immediately on 5 April 2025; run delivery confirmation and shortage-cover work alongside placement rather than delaying these orders. [F4, F5, F6]
-2. Immediately arrange expedited shipping, earlier partial deliveries or alternative-source cover to bridge BearingCap's 10-week gap and ThrustWasher's 2-week gap, alongside the main orders. [F4, F5]
-3. Obtain item-level delivery commitments for the plant-move period alongside the orders due immediately and before placing the later orders; use the revised lead time when scheduling the remaining purchases. [F1]
-4. Before placing the GasketKit order by 19 April 2025, establish whether the reported demand increase is in the UK and already included in the sales-based suggestion. Retain the suggested quantity of 5200 unless that review establishes a need to revise it. [F2]
+1. Immediately arrange expedited shipping, a partial delivery or alternative supply for BearingCap to bridge its 10-week gap, with usable supply available by 28 June 2025. Progress this alongside placing the replenishment order on 5 April 2025 rather than delaying the order. [F4]
+2. Immediately arrange expedited shipping, a partial delivery or alternative supply for ThrustWasher to bridge its two-week gap, with usable supply available by 23 August 2025. Progress this alongside placing the replenishment order on 5 April 2025 rather than delaying the order. [F5]
+3. Place the ValveSeat order on 5 April 2025; obtain delivery acknowledgement alongside order placement because its remaining cover equals the revised lead time. [F6]
+4. Obtain item-level production allocations and committed delivery dates for the order, using the extended lead time for planning. Run this alongside the orders due immediately, and before placing the remaining orders, without allowing confirmation to delay any revised latest order date. [F1]
+5. Before placing the GasketKit order, and no later than 19 April 2025, establish which market the reported increase concerns and whether the fleet contract is already reflected in the UK sales plan. Change the quantity only if this establishes additional UK demand not already included. [F2, F7]
 
 ## Item Details
 
@@ -151,4 +153,4 @@ Check internally:
 | 2 | gasketkit_contract_2025-02.docx | 2025-02-20 | GasketKit (any supplier) |
 | 3 | oilseal_review_2024.docx | 2024-12-15 | OilSeal (any supplier) |
 
-Run id: 2026-10-29_004531_judge-checks-renumbered-without-gaps-j3a-c-j4-j8
+Run id: 2026-11-19_115421_kestrel-sample-one-record-entry-per-agent

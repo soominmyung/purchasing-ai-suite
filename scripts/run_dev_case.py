@@ -26,9 +26,10 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from config import settings  # noqa: E402
 from services import documents, run_record  # noqa: E402
-from services.agents import AGENT_EFFORT, AGENT_MODELS, purchasing_graph, run_email_draft_agent  # noqa: E402
+from services.agents import AGENT_EFFORT, AGENT_MODELS, agents_used, purchasing_graph, run_email_draft_agent  # noqa: E402
 from services.item_grouping import group_by_supplier_and_recommend  # noqa: E402
 from services.prompts import prompt_texts  # noqa: E402
+from services.quality_checks import judge_prompt_texts  # noqa: E402
 from utils.csv_utils import parse_csv_rows  # noqa: E402
 from utils.docx_utils import save_markdown_to_docx  # noqa: E402
 
@@ -38,12 +39,13 @@ DOCUMENTS = (("analysis_report", "report_md"), ("purchase_request", "pr_md"),
 
 
 def prompts_used() -> dict[str, str]:
-    """The exact text of every prompt in use, as loaded."""
-    return prompt_texts()
+    """The exact text of every prompt in use: the prompt files as loaded, and the judges' system
+    prompt and checks, which are in code."""
+    return {**prompt_texts(), **judge_prompt_texts()}
 
 
 def settings_used() -> dict:
-    keys = ("evaluator_model", "analysis_rewrites", "llm_timeout_seconds", "llm_retries",
+    keys = ("analysis_rewrites", "llm_timeout_seconds", "llm_retries",
             "judge_timeout_seconds", "judge_retries", "run_date")
     return {k: getattr(settings, k, None) for k in keys}
 
@@ -125,14 +127,14 @@ def main() -> None:
                                               "'default' leaves it to the API)")
     args = ap.parse_args()
     if args.analysis_model:
-        AGENT_MODELS["analysis"] = args.analysis_model  # recorded in the run's "models"
+        AGENT_MODELS["analysis"] = args.analysis_model  # recorded in the run's "agents"
     if args.analysis_effort:
         AGENT_EFFORT["analysis"] = None if args.analysis_effort == "default" else args.analysis_effort
     case, group = load_case(args.case)
     folder = new_folder(args.label)
     record = {"label": args.label, "case": case["name"], "started": datetime.now().isoformat(timespec="seconds"),
               "kind": "email only" if args.email_only else "full run",
-              "settings": settings_used(), "models": AGENT_MODELS, "efforts": AGENT_EFFORT, "prompts": prompts_used()}
+              "settings": settings_used(), "agents": agents_used(), "prompts": prompts_used()}
     if args.email_only:
         if not args.earlier:
             ap.error("--email-only needs --from <run folder>")

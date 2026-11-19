@@ -1,7 +1,7 @@
 """
 The approval agent comparison, the judge's checks: P1a-c (nothing added, no judging words, no
 overstatement) on every purchase request in eval_results/approval_model_comparison.jsonl (each model
-and effort, 25 scenarios), three runs each, with the production judge (settings.evaluator_model,
+and effort, 25 scenarios), three runs each, with the production judge (services/agents.py, approval_judge,
 chosen in docs/judge_selection.md) and the production P1 wording. P2 and P3 were checked in code
 when the text was written.
 
@@ -26,6 +26,7 @@ sys.path.insert(0, str(ROOT))
 import scripts.run_judge_validation as jv  # noqa: E402  (the usage recorder and file hash)
 from config import settings  # noqa: E402
 from services import quality_checks as q  # noqa: E402
+from services.agents import judge_for  # noqa: E402
 from scripts.compare_approval_models import CONFIGS, label, settings_text  # noqa: E402
 
 TEXTS = ROOT / "eval_results" / "approval_model_comparison.jsonl"
@@ -46,7 +47,7 @@ if "--estimate" in sys.argv:  # the chosen setting on the analyses rebuilt after
     BASE = ROOT / "eval_results" / "base_outputs_estimate.jsonl"
     OUT = ROOT / "eval_results" / "approval_model_judged_estimate.jsonl"
     SETTINGS = ROOT / "eval_results" / "approval_model_judged_estimate_settings.json"
-JUDGE = settings.evaluator_model
+JUDGE = judge_for("approval_judge")
 PRICE = (0.10, 0.50)  # claude-haiku-5-5, per million tokens in / out, as in the judge validation
 REPS = 3
 

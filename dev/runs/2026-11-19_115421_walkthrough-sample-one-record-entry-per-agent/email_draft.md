@@ -10,9 +10,9 @@ We are planning a possible order of the following items and would be grateful fo
 - ValveCap — purchase quantity: 2,600; requested delivery date: 2025-09-20
 - SealPlate — purchase quantity: 2,600; requested delivery date: 2025-10-18
 
-Could you please confirm current availability, lead times and commercial terms for the items, quantities and requested delivery dates listed above? For BushingSleeve and GasketRing, what expedited production, partial shipment or faster transport options can you offer, and what quantities and delivery dates can you commit to?
+Could you please confirm current availability, lead times and commercial terms for the items and quantities listed above? For BushingSleeve and GasketRing, what expedited production, partial delivery or faster shipping options can you offer, and what are the earliest achievable delivery dates?
 
-Could you also confirm the delivery commitments you can offer for this order during the moulding-line refit, and whether any lead-time extension will be limited to four weeks? What export-document checks will you carry out for this order, and do you expect any documentation-related delays?
+Could you confirm your delivery commitments against the requested dates above? Could you also outline the export-document checks for this order and confirm whether any outstanding documentation requirements could affect delivery?
 
 Thank you in advance; we look forward to your reply.
 

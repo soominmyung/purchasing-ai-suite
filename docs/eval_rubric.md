@@ -100,6 +100,6 @@ the signature. The agent never receives stock figures, risk levels or internal q
 ## The judge
 
 `claude-haiku-5-5`, thinking at high effort, answering in the shape of a scoring sheet, one call
-per draft (`evaluator_model` in `config.py`). It is from a different model family from the
+per draft (`judge_model`, `judge_effort` and `judge_output` in `config.py`). It is from a different model family from the
 writers (`gpt-6.1-sol`), so no draft is judged by a model of its own family. Before use it was
 validated on outputs with known faults and on hand-scored outputs (`docs/judge_selection.md`).

@@ -51,9 +51,9 @@ def _done(path: Path) -> set[str]:
 def _score(group: dict, analysis: dict, docs: list[dict]) -> dict:
     if not isinstance(analysis, dict) or "unparsed_output" in analysis:
         return {"verdict": "unparsed", "failed": ["C1"], "warnings": [], "checks": {}, "unparsed": True}
-    ev = evaluate_analysis(group["supplier"], group["items"], analysis, docs, settings.evaluator_model,
-                           snapshot_date=SNAPSHOT_DATE)
-    return {**ev, "unparsed": False}
+    judge = agents.judge_for("analysis_judge")
+    ev = evaluate_analysis(group["supplier"], group["items"], analysis, docs, judge, snapshot_date=SNAPSHOT_DATE)
+    return {**ev, "judge": judge, "unparsed": False}
 
 
 def _one(model: str, s: dict) -> dict:

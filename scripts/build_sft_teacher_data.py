@@ -28,7 +28,7 @@ from langchain_core.messages import HumanMessage, SystemMessage  # noqa: E402
 from config import settings  # noqa: E402
 from scripts.eval_scenarios import SNAPSHOT_DATE, preprocess  # noqa: E402
 from services.agents import (_extract_json_from_text, _llm, analysis_history, document_references,  # noqa: E402
-                             from_model, history_for_model)
+                             from_model, history_for_model, judge_for)
 from services.prompts import ANALYSIS_AGENT_SYSTEM, PROMPT_VERSION  # noqa: E402
 from services.quality_checks import evaluate_analysis  # noqa: E402
 
@@ -56,8 +56,9 @@ def run_one(s: dict) -> dict:
         evaluation = {"verdict": "unparsed", "failed": ["C1"], "warnings": [], "checks": {}}
     else:
         analysis["references"] = {"documents": document_references(docs), "window": window}
-        evaluation = evaluate_analysis(group["supplier"], group["items"], analysis, docs, settings.evaluator_model,
-                                       snapshot_date=SNAPSHOT_DATE)
+        judge = judge_for("analysis_judge")
+        evaluation = {**evaluate_analysis(group["supplier"], group["items"], analysis, docs, judge,
+                                          snapshot_date=SNAPSHOT_DATE), "judge": judge}
     return {"scenario_id": s["scenario_id"], "category": s["category"], "labels": s["labels"],
             "teacher": TEACHER, "effort": EFFORT, "prompt_version": PROMPT_VERSION,
             "generated_at": datetime.now().isoformat(timespec="seconds"), "seconds": seconds,

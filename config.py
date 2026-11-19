@@ -13,14 +13,18 @@ class Settings(BaseSettings):
     # API access token (X-API-Key header verification)
     api_access_token: Optional[str] = None
 
-    # Model that checks each analysis ("provider:model"). From a different provider than the
-    # model that writes the analysis (gpt-6.1-sol), so the analysis is never judged by its own
+    # The judge: the model that makes the judgement checks on the analysis, the purchase request
+    # and the email (three calls, one per output, all with these settings). From a different
+    # provider than the model that writes them (gpt-6.1-sol), so no output is judged by its own
     # author or a model of the same family. Provisional until judge validation: Claude Haiku
     # since 2026-10-23, after gemini-3.7-flash took 30-109 s per call and then returned 504,
     # 503 and 429. Needs CLAUDE_API_KEY (or ANTHROPIC_API_KEY).
-    # chosen by judge validation, 2026-10-24 (docs/judge_selection.md): Haiku
-    # thinking at high effort, its answer shaped like the scoring sheet; one call per output
-    evaluator_model: str = "anthropic:claude-haiku-5-5?effort=high&format=schema"
+    # Chosen by judge validation, 2026-10-24 (docs/judge_selection.md): Haiku thinking at high
+    # effort, its answer shaped like the scoring sheet (judge_output "schema": one JSON object with
+    # each check's evidence and verdict, enforced by structured outputs).
+    judge_model: str = "claude-haiku-5-5"
+    judge_effort: str = "high"
+    judge_output: str = "schema"
     # An analysis that fails a blocking code check is sent back to the analysis agent with the
     # failures, up to this many times, before any document is written (services/agents.py).
     analysis_rewrites: int = 2

@@ -4,8 +4,9 @@ Run records: one JSON file per pipeline run, kept on the company server.
 A record holds everything needed to explain a run afterwards and to track quality, cost
 and failures across runs: the CSV exactly as received, who sent it (client IP), the
 snapshot date and where it came from, per supplier the items as preprocessed, the history
-documents the model read (their text as it was then), every output, the evaluation, each
-email check, and per node the time taken, tokens per model and any error.
+documents the model read (their text as it was then), each agent's model and effort (the
+three judges included), every output, the evaluation, each email check, and per node the time
+taken, tokens per model and any error.
 
 These files contain the company data that is kept out of LangSmith,
 so the folder needs restricted access and a retention period.
@@ -17,6 +18,7 @@ in the same folder, which open in Excel and can be filtered and pivoted as the o
 """
 import contextvars
 import csv
+import hashlib
 import json
 import time
 import uuid
@@ -104,7 +106,11 @@ def _totals(nodes: list[dict]) -> dict[str, Any]:
 class RunRecord:
     """Collects one run and writes it to runs/<run_id>.json, also when the run fails."""
 
-    def __init__(self, csv_content: str, csv_filename: str, ip: str, models: dict[str, str]):
+    def __init__(self, csv_content: str, csv_filename: str, ip: str, agents: dict[str, dict[str, Any]]):
+        """agents: each agent's model and effort, the three judges included (services/agents.agents_used)."""
+        from services.quality_checks import judge_prompt_texts
+        judge_hashes = {name: hashlib.sha256(text.encode("utf-8")).hexdigest()
+                        for name, text in judge_prompt_texts().items()}
         self.run_id = new_run_id()
         self.data: dict[str, Any] = {
             "run_id": self.run_id,
@@ -112,9 +118,11 @@ class RunRecord:
             "finished_at": None,
             "status": "running",
             "client_ip": ip,
+            # prompt_version covers the prompt files (services/prompts.py); the SHA-256 of each is
+            # listed with those of the judges' fixed texts, which are in code
             "prompt_version": PROMPT_VERSION,
-            "prompt_sha256": prompt_hashes(),
-            "models": models,
+            "prompt_sha256": {**prompt_hashes(), **judge_hashes},
+            "agents": agents,
             "input": {"filename": csv_filename, "raw_csv": csv_content},
             "groups": [],
             "error": None,
@@ -226,8 +234,9 @@ def _append_stats(data: dict) -> None:
         pr = g.get("approval_check") or {}
         mail = g.get("email_validation") or {}
         tokens = (g.get("totals") or {}).get("tokens") or {}
-        stats.append({**base, "analysis_model": (data.get("models") or {}).get("analysis"),
-                      "judge": (data.get("models") or {}).get("judge"), "supplier": g.get("supplier"),
+        agents = data.get("agents") or {}
+        stats.append({**base, "analysis_model": (agents.get("analysis") or {}).get("model"),
+                      "judge": (agents.get("analysis_judge") or {}).get("model"), "supplier": g.get("supplier"),
                       "group_status": g.get("status"), "items": len(g.get("items") or []),
                       "verdict": ev.get("verdict"), "blocking_failed": ";".join(ev.get("failed") or []),
                       "warnings": ";".join(ev.get("warnings") or []),

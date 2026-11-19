@@ -9,11 +9,12 @@ particular rules. Synthetic data only.
 
 Run a case with `scripts/run_dev_case.py` (the whole pipeline, or the email agent alone on an
 earlier run's analysis). Each run is recorded in `dev/runs/`: what was changed before the run,
-models, settings, the exact text of every prompt used, inputs, outputs, node
-times and checks, with each document as `.md` and `.docx`. Two runs are committed as samples:
+each agent's model and effort (the three judges included), settings, the exact text of every
+prompt used (the judges' system prompt and checks included), inputs, outputs, node times and
+checks, with each document as `.md` and `.docx`. Two runs are committed as samples:
 `kestrel_components` through the whole pipeline with the current prompts and checks
-(`runs/2026-10-29_004531_judge-checks-renumbered-without-gaps-j3a-c-j4-j8/`), and `meridian_seals_walkthrough`,
-a short worked example of one run (`runs/2026-11-04_162511_walkthrough-example-v2-supplier-wide-lead-time-not/`); the others are not committed.
+(`runs/2026-11-19_115421_kestrel-sample-one-record-entry-per-agent/`), and `meridian_seals_walkthrough`,
+a short worked example of one run (`runs/2026-11-19_115421_walkthrough-sample-one-record-entry-per-agent/`); the others are not committed.
 
 ## Cases
 

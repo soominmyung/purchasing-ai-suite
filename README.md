@@ -8,7 +8,7 @@ and by an LLM judge before the buyer sees it.
 
 > **Portfolio (8 pages):** [English](docs/Purchasing_AI_Suite_en.pdf) · [Korean](docs/Purchasing_AI_Suite_ko.pdf)
 >
-> **One run, end to end:** one supplier's stock CSV and three history documents ([case](dev/cases/meridian_seals_walkthrough.json)), and the analysis report, purchase request and supplier email written from them, as Word and Markdown, with every check's verdict ([run](dev/runs/2026-11-04_162511_walkthrough-example-v2-supplier-wide-lead-time-not/)).
+> **One run, end to end:** one supplier's stock CSV and three history documents ([case](dev/cases/meridian_seals_walkthrough.json)), and the analysis report, purchase request and supplier email written from them, as Word and Markdown, with every check's verdict ([run](dev/runs/2026-11-19_115421_walkthrough-sample-one-record-entry-per-agent/)).
 
 | | |
 |---|---|
@@ -168,12 +168,13 @@ ItemCode,ItemName,SupplierName,AvailableStock,WksToOOS
 A sample is in [`050425.csv`](050425.csv). Development cases with history documents are in
 [`dev/cases/`](dev/cases/); `python scripts/run_dev_case.py dev/cases/kestrel_components.json --label "…"`
 runs one through the whole pipeline and records it under `dev/runs/`; a sample record of that case:
-[`dev/runs/2026-10-29_004531_judge-checks-renumbered-without-gaps-j3a-c-j4-j8/`](dev/runs/2026-10-29_004531_judge-checks-renumbered-without-gaps-j3a-c-j4-j8/).
+[`dev/runs/2026-11-19_115421_kestrel-sample-one-record-entry-per-agent/`](dev/runs/2026-11-19_115421_kestrel-sample-one-record-entry-per-agent/).
 
-**Main settings** (`config.py`, overridable by environment variables): `evaluator_model`,
-`analysis_rewrites`, `history_window_months`, `history_docs_per_scope`,
+**Main settings** (`config.py`, overridable by environment variables): `judge_model`,
+`judge_effort`, `judge_output`, `analysis_rewrites`, `history_window_months`, `history_docs_per_scope`,
 `langsmith_hide_content`, `deliver_evaluation_report`. Agent models and efforts are in
-`services/agents.py` (`AGENT_MODELS`, `AGENT_EFFORT`).
+`services/agents.py` (`AGENT_MODELS`, `AGENT_EFFORT`); every run records them with one entry per
+agent, the three judges included.
 
 ---
 
