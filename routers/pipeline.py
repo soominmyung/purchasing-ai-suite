@@ -36,6 +36,7 @@ from services.agents import (
     purchasing_graph,
 )
 from services.run_record import RunRecord, client_ip
+from tracing import trace_config
 
 router = APIRouter()
 
@@ -122,12 +123,7 @@ def _run_pipeline_inner(
                     "iteration_count": 0,
                     "is_valid_email": False
                 },
-                config=(
-                    {"run_name": "Purchasing-Workflow", "metadata": {"env": "production", "run_id": record.run_id}}
-                    if settings.langsmith_hide_content else
-                    {"run_name": f"Purchasing-Workflow-{supplier}",
-                     "metadata": {"supplier": supplier, "env": "production", "run_id": record.run_id}}
-                )
+                config=trace_config("Purchasing-Workflow", record.run_id, "production", supplier)
             ):
                 # event: {node_name: {state_key: value}}
                 node_name = list(event.keys())[0]

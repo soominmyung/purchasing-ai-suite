@@ -9,7 +9,7 @@ WORKDIR /app
 COPY --chown=appuser requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
-COPY --chown=appuser main.py config.py schemas.py ./
+COPY --chown=appuser main.py config.py tracing.py schemas.py ./
 COPY --chown=appuser routers ./routers
 COPY --chown=appuser services ./services
 COPY --chown=appuser utils ./utils

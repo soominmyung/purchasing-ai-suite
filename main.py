@@ -7,24 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import settings
-
-# --- LangSmith (Observability) Setup ---
-# MUST BE DONE BEFORE ANY OTHER IMPORTS
-import re
-
-if settings.langchain_tracing_v2:
-    # keep only the characters an API key can contain (stray spaces or quotes from the environment)
-    clean_key = re.sub(r'[^a-zA-Z0-9_-]', '', (settings.langchain_api_key or ""))
-    
-    os.environ["LANGCHAIN_TRACING_V2"] = "true"
-    os.environ["LANGSMITH_TRACING"] = "true"
-    os.environ["LANGCHAIN_ENDPOINT"] = settings.langchain_endpoint
-    os.environ["LANGCHAIN_API_KEY"] = clean_key
-    os.environ["LANGCHAIN_PROJECT"] = settings.langchain_project
-    if settings.langsmith_hide_content:
-        os.environ["LANGSMITH_HIDE_INPUTS"] = "true"
-        os.environ["LANGSMITH_HIDE_OUTPUTS"] = "true"
+from config import settings  # first: it also sets up LangSmith tracing (tracing.py)
 
 from services.vector_store import get_vector_stores
 from routers import pipeline, ingest, output

@@ -19,6 +19,8 @@ from typing import Any
 
 from langsmith import traceable
 
+import config  # noqa: F401  (first: LangSmith is set up from the settings before the judge is traced)
+
 REQUIRED_FIELDS = {"summary": str, "findings": list, "critical_questions": list,
                    "lead_time_changes": list, "quantity_changes": list, "figures_after_changes": list,
                    "recommended_actions": list}

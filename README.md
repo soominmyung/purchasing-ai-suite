@@ -112,9 +112,12 @@ Gemma 4 12B was served with vLLM on one RTX 5090 and fine-tuned with QLoRA SFT
 - The email input leaves out the stock and risk fields and the questions marked internal; the
   supplier questions it carries were checked for internal data in the analysis (J5), and the email
   itself is checked again before it goes out (E1–E3).
-- LangSmith: content hiding is on by default (`langsmith_hide_content`). Prompt and response text is
-  hidden and supplier names are left out of trace names and metadata; timings, token counts, model
-  names and error messages are still sent, and error messages are written to carry no data.
+- LangSmith: content hiding is on by default (`langsmith_hide_content`) wherever the pipeline runs,
+  the scripts included, and is applied in the one client every trace goes through (`tracing.py`).
+  Prompt and response text is hidden; metadata keeps only fixed keys (run id, environment, model and
+  node names), so no supplier name reaches it, and run names are fixed; an error is sent as the
+  exception's type and where it was raised, without its message. Timings, token counts and model
+  names are still sent.
 - Each run is recorded on the company server as JSON (inputs, history used, outputs, checks, times,
   tokens), with run and check statistics appended to CSV files.
 - All data in this repository is synthetic.

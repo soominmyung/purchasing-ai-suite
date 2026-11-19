@@ -8,8 +8,9 @@ Every file in the repository, by folder. The overview of the system is in [`READ
 |---|---|
 | `README.md` | Overview: how a run works, the quality checks, the model choices, self-hosting, how to run it |
 | `FILES.md` | This list |
-| `main.py` | The FastAPI app: LangSmith settings at start-up, the routers, access control |
-| `config.py` | Settings, read from environment variables (`.env`): models, rewrites, history window, LangSmith, run records |
+| `main.py` | The FastAPI app: the routers, access control |
+| `config.py` | Settings, read from environment variables (`.env`): models, rewrites, history window, LangSmith, run records; sets up tracing as soon as they are read |
+| `tracing.py` | LangSmith tracing, the same for the API server and the scripts: with content hidden, the one client every trace goes through hides inputs and outputs, keeps only fixed metadata keys and sends an error as its type and where it was raised |
 | `schemas.py` | Request and response models of the API, validated at the API boundary |
 | `requirements.txt` | Python dependencies |
 | `Dockerfile` | Container image for Cloud Run |

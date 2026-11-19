@@ -30,6 +30,7 @@ from services.agents import AGENT_EFFORT, AGENT_MODELS, agents_used, purchasing_
 from services.item_grouping import group_by_supplier_and_recommend  # noqa: E402
 from services.prompts import prompt_texts  # noqa: E402
 from services.quality_checks import judge_prompt_texts  # noqa: E402
+from tracing import trace_config  # noqa: E402
 from utils.csv_utils import parse_csv_rows  # noqa: E402
 from utils.docx_utils import save_markdown_to_docx  # noqa: E402
 
@@ -71,7 +72,8 @@ def full_run(case: dict, group: dict, folder: Path) -> dict:
               "is_valid_email": False, "history_override": case["history"],
               "data_issue_lines": group.get("data_issue_lines", []), "run_id": folder.name}
     state, started = dict(state0), time.perf_counter()
-    for event in purchasing_graph.stream(state0):
+    for event in purchasing_graph.stream(state0, config=trace_config("Purchasing-Workflow", folder.name, "development",
+                                                                     group["supplier"])):
         for node, update in event.items():
             print(f"{time.perf_counter() - started:6.1f}s  {node} done", flush=True)
             for k, v in (update or {}).items():

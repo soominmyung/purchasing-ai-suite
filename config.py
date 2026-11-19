@@ -3,6 +3,8 @@ from datetime import date
 from typing import Optional
 from pydantic_settings import BaseSettings
 
+from tracing import configure_tracing
+
 
 class Settings(BaseSettings):
     """Application settings."""
@@ -80,8 +82,9 @@ class Settings(BaseSettings):
     langchain_api_key: Optional[str] = None
     langchain_project: str = "purchasing-automation"
     # On by default, so that real company data never reaches LangSmith by omission: traces then
-    # carry structure, timings, token counts and model names, but no prompt or response text.
-    # Error messages are still sent, so exceptions must not quote data. Turn it off
+    # carry structure, timings, token counts and model names, but no prompt or response text, no
+    # metadata beyond fixed keys and no error message beyond the exception's type and where it was
+    # raised (tracing.py). Applies wherever the pipeline runs, scripts included. Turn it off
     # (LANGSMITH_HIDE_CONTENT=false) only on synthetic data.
     langsmith_hide_content: bool = True
 
@@ -91,6 +94,10 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# LangSmith set up from these settings before anything is traced, whatever imports them first
+# (the API server or a script): tracing.py
+configure_tracing(settings)
 
 
 def run_date() -> date:
