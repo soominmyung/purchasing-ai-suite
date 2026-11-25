@@ -70,13 +70,12 @@ citation resolves; the judge checks that each one supports what rests on it.
 | Supplier email | E1–E3 (no internal data; no past supplier problem, or when it occurred, mentioned directly, while questions about procedures for this order pass; no item outside the order) | Code, Haiku | Rewrite (up to 2), then note |
 | | E4–E7 (every point asked, no repeat, earliest dispatch asked, tone of a request) | LLM judge | Note in the draft |
 
-Definitions: [`docs/eval_rubric.md`](docs/eval_rubric.md). Check ids were renumbered on 29 Oct 2026;
+Definitions: [`docs/eval_rubric.md`](docs/eval_rubric.md) · Model I/O examples and safeguards (Korean): [`docs/pipeline_io_and_checks.md`](docs/pipeline_io_and_checks.md). Check ids were renumbered on 29 Oct 2026;
 records written before use the old ids (mapping: `LEGACY_IDS` in `services/quality_checks.py`).
 
 **The judge was validated before use** ([`docs/judge_selection.md`](docs/judge_selection.md)):
 on 51 samples (49 with a fault, 2 without) it caught 93.9% of the faults, with 3.9% of verdicts
 changing between runs, and 8.0% false alarms on 89 hand-scored verdicts of six other outputs.
-Letting Haiku reason before answering raised its detection from 83.7%.
 
 ---
 
@@ -88,7 +87,7 @@ reviewed manually:
 | Agent | Chosen | Compared with | Record |
 |---|---|---|---|
 | Analysis | `gpt-6.1-sol`, medium effort | `gpt-4o`, `gpt-6-luna`, `claude-sonnet-5-5`, Gemini Flash (7 models, 9 settings) | [`analysis_model_selection.md`](docs/analysis_model_selection.md) |
-| Judge | `claude-haiku-5-5`, high effort | Haiku without reasoning, Haiku medium, `gpt-6-luna`, Gemini Flash-Lite | [`judge_selection.md`](docs/judge_selection.md) |
+| Judge | `claude-haiku-5-5`, high effort | Haiku medium, `gpt-6-luna`, Gemini Flash-Lite | [`judge_selection.md`](docs/judge_selection.md) |
 | Purchase request | `gpt-6.1-sol`, low effort | `gpt-4o`, `gpt-5.4-mini`, `gpt-6-luna` at several efforts | [`approval_model_selection.md`](docs/approval_model_selection.md) |
 | Supplier email | `gpt-6.1-sol`, low effort | `gpt-5.4-mini`, `gpt-6-luna` at several efforts | [`email_model_selection.md`](docs/email_model_selection.md) |
 | Email validator | `claude-haiku-5-5`, medium effort | `gpt-4o-mini`, Haiku low and high | [`email_model_selection.md`](docs/email_model_selection.md) |
@@ -160,7 +159,9 @@ supplier, even about the same item. Names and codes match whatever their capital
 punctuation (`Meridian Seals` and `MERIDIAN-SEALS` are one supplier). The date is read in the usual
 written forms (`2025-04-05`, `5 April 2025`, `5 Apr 2025`, `April 5, 2025`, `05/04/2025`,
 `2025.04.05`); figures alone are read day first, as in the UK. On the company server, a shared
-folder is kept in sync instead (`/api/ingest/history/folder`).
+folder is kept in sync instead (`/api/ingest/history/folder`), indexing whole PDF text and header
+metadata regardless of subfolder layout and updating only new, changed or deleted files via SHA-256
+hash comparison.
 
 **Stock CSV.** Upload to `POST /api/run` (or `/api/run/stream` for progress events), with the `X-API-Key`
 header:

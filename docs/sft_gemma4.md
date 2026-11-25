@@ -181,7 +181,7 @@ message only. A typical example is about 4,800 prompt tokens and 2,000 answer to
 ### Split
 
 | Set | Size | Use |
-|---|---|---|
+|---|---|---|d
 | Training | 85 of the 98 | Training, in a fixed order interleaving the types |
 | Validation | 13 of the 98 (a tenth per type) | Validation loss, to choose the checkpoint |
 | Generalisation | 7 scenarios of a type no training scenario has (a supplier pushing a newly launched product) | Evaluation only |

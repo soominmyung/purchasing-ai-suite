@@ -49,9 +49,20 @@ Detection, flip, cost and time are from the seeded-fault test, one call per judg
 (`eval_results/judge_validation_round1_runs.jsonl` and `_round2_runs.jsonl`, single mode); false
 alarms from the separate test (`eval_results/judge_false_alarm_runs.jsonl`).
 
-Gemini Flash-Lite did not finish a round reliably. Round 1 called Haiku through a forced tool call,
-which leaves it no room to think while Luna reasoned; round 2 therefore let Haiku think first and
-answer in the scoring sheet's shape (structured outputs).
+Gemini Flash-Lite did not finish a round reliably. The judge receives a text prompt containing the
+input given to the writer, the writer's output, and the inspection criteria. It returns a scoring
+sheet keyed by check ID, with evidence, a Boolean verdict and a note for a failure.
+
+In round 1, the Haiku configuration omitted the response-format option. The Python adapter's
+default path sent a `record_verdicts` tool definition and set `tool_choice` to require that specific
+call. Haiku returned a call request containing the scoring sheet as arguments. The adapter read
+those arguments as the result. That API setting made Haiku start its response with the tool call and
+skip the thinking step. [Claude API tool selection](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools#controlling-claudes-output)
+
+In round 2, the adapter set the reply's JSON schema directly with `output_config.format`, and
+read the scoring sheet from the response text. It set medium or high reasoning effort and
+increased the output allowance from 4,000 to 16,000 tokens. The comparison measures those
+settings together. [Claude API structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs)
 
 **One wording fixed on the way (P1a).** In the hand-scored set, the only fail was a purchase request
 adding "supporting the decision to proceed with this supplier". No judge caught it. P1a now says
@@ -64,14 +75,11 @@ also failed a plain summary of a document. With the kept wording: caught 3/3, th
 - **Why validate at all:** in the analysis model comparison the judge had become the larger source of
   error. It failed a correct 50% quantity rise with a wrong reason and the rewrite followed it to a
   wrong figure; it passed a wrong lead time and then, on the same output, failed and passed it.
-- **Round 1: the model was not the problem; the way it was asked was.** Haiku caught 83.7% of the
-  seeded faults and its verdicts flipped on 17.6% of samples; Luna caught 89.1%. Round 1 did not
-  compare them on equal terms: the judge's answer was forced through a tool call, and with a forced
-  tool Haiku returns only a `tool_use` block, no thinking (1,637 output tokens against 3,346 with thinking
-  on the same sample), while Luna reasoned. Gemini Flash-Lite answered too seldom to judge (429
-  errors).
-- **Round 2: let it think.** The same Haiku, answering in the scoring sheet's shape so that it thinks
-  first: 91.2% at medium effort, **93.9% at high, flip 3.9%**. The checks it had missed most improved
+- **Round 1 used tool-call arguments.** Haiku caught 83.7% of the
+  seeded faults and its verdicts flipped on 17.6% of samples. Luna ran with reasoning and caught
+  89.1%. Gemini Flash-Lite returned too few verdicts because of rate-limit errors (429).
+- **Round 2 used a structured JSON reply.** Haiku caught 91.2% at medium effort and
+  **93.9% at high**, with a **3.9% flip rate** at high. The checks it had missed most improved
   most: J3a (direction of a change) 5/9 to 8/9, J3b (size) 3/9 to 6/9, J7 (a problem document left
   unused) 1/6 to 4/6, P1c (meaning kept) 6/9 to 9/9. GPT-4o's wrong lead time for a fixed customs
   hold, passed every time in round 1, was now caught two times in three.

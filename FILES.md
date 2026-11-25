@@ -79,6 +79,7 @@ Every file in the repository, by folder. The overview of the system is in [`READ
 | `Purchasing_AI_Suite_ko.pdf` | Portfolio, Korean (8 pages) |
 | `images/pipeline.png` | The pipeline diagram in the README |
 | `eval_rubric.md` | Definitions of all 36 checks, what each needs to pass, severity, what happens on a failure |
+| `pipeline_io_and_checks.md` | Model input and response examples, and the prompt and code safeguards behind all 36 checks (Korean) |
 | `stock_figures.md` | How code works out each stock figure from the snapshot date (English and Korean) |
 | `analysis_model_selection.md` | How the analysis model and effort were chosen |
 | `judge_selection.md` | How the judge was validated and chosen |

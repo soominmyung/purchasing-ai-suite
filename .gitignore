@@ -65,3 +65,10 @@ SESSION_HISTORY.md
 # Run records hold company data (services/run_record.py); never commit them.
 # Only the top-level folder: dev/runs/ holds development runs on synthetic data.
 /runs/
+
+# Personal job application documents and local export bundles — never commit
+*이력서*
+*지원서*
+*포트폴리오*.pdf
+docs/Purchasing_AI_Suite_*.html
+docs/Purchasing_AI_Suite_*.zip
