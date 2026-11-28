@@ -54,11 +54,11 @@ async def ingest_history_pdf(
     files: list[UploadFile] = File(..., description="History PDFs"),
 ):
     """
-    Upload history PDFs. What a document is about is read from its first lines: 'Supplier:',
-    'Item:' (several separated by commas), 'ItemCode:', 'Date:'. A supplier alone means the
-    supplier as a whole; a supplier and items, those items from that supplier; items alone, the
-    items whoever supplies them. The response gives each document's header as it was read, so
-    the uploader can check it.
+    Upload history PDFs. What a document is about is read from its first lines: 'Supplier:'
+    (required), 'Item:' (optional, several separated by commas), 'ItemCode:' (optional), 'Date:'.
+    A supplier alone means the supplier as a whole; a supplier and items mean those items from
+    that supplier. The response gives each document's header as it was read, so the uploader
+    can check it.
     """
     if not files:
         raise HTTPException(status_code=400, detail="At least one PDF file required.")

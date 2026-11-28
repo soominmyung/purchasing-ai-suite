@@ -30,10 +30,10 @@ and by an LLM judge before the buyer sees it.
 2. **Figures in code.** Risk level from weeks to stockout against the 18-week lead time, latest
    order and delivery dates, and the suggested quantity (26 weeks of sales after arrival), all
    counted from the snapshot date ([`docs/stock_figures.md`](docs/stock_figures.md)).
-3. **History in code.** The documents of the 12 months before the snapshot, matched on their
-   headers, the latest five in each scope: about the supplier as a whole or its other items;
-   and, for each item, the supplier's own documents about it and, apart, documents about the
-   item that name no supplier (demand, the market).
+3. **History in code.** The documents of the 12 months before the snapshot for this supplier,
+   matched on their headers (`Supplier:` required; optional `Item:`/`ItemCode:`), the latest five
+   in each scope: about the supplier (supplier-wide or its other items), and for each item in the
+   order.
 4. **Analysis (LLM).** `gpt-6.1-sol` states the facts in the history, each citing its document, and
    proposes lead-time or quantity changes, questions for the supplier and actions, each citing the
    facts it rests on. Code recalculates every figure after a proposed change.

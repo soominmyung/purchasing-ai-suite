@@ -146,10 +146,10 @@ def _extract_event_date(text: str) -> str:
 
 
 # ----------------------------------------------------------------------------- history
-# One collection for all purchasing history. Whether a document is about a supplier, an
-# item, or an item from a supplier is read from its header, not from where it was uploaded:
-#   Supplier: <name>          (absent for an item-only document, e.g. a demand spike)
-#   Item: <name>[, <name>]    (absent for a supplier-wide document, e.g. a strike)
+# One collection for all purchasing history. Every document belongs to a supplier, read from
+# its header (not from where it was uploaded):
+#   Supplier: <name>          (required; alone = supplier-wide, e.g. a strike or line refit)
+#   Item: <name>[, <name>]    (optional; narrows the document to those items from this supplier)
 #   ItemCode: <code>[, ...]   (optional)
 #   Date: <date>
 HISTORY_COLLECTION = "history"
@@ -215,10 +215,10 @@ def history_metadata(header: dict[str, Any], source: str = "", origin: str = "up
 def ingest_history(text: str, source: str = "", origin: str = "upload", fingerprint: str = "") -> dict[str, Any]:
     """Store one history document, replacing any earlier version with the same origin and
     source, so a file sent twice is held once. Returns what its header was read as, so the
-    uploader can check it. A document that names neither a supplier nor an item is refused."""
+    uploader can check it. A document that names no supplier is refused."""
     header = parse_history_header(text)
-    if not header["supplier"] and not header["items"] and not header["item_codes"]:
-        raise ValueError("The header names no supplier and no item (expected 'Supplier:' and/or 'Item:' lines).")
+    if not header["supplier"]:
+        raise ValueError("The header names no supplier (expected a 'Supplier:' line).")
     if source:
         delete_history_source(origin, source)
     # stored whole: a history document is at most two pages and is retrieved by its metadata
@@ -271,32 +271,21 @@ def _months_before(day: str, months: int) -> str:
 def search_history(supplier: str, items: list[tuple[str, str]], as_of: str,
                    months: int, per_scope: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """
-    History documents for one analysis. A document qualifies when it names this supplier, or
-    names any of these items (by code or name) and no supplier, and is dated within `months`
-    before `as_of`. Within that, the `per_scope` most recent documents are kept in each scope:
-    one for the supplier (supplier-wide documents and documents about its other items) and two
-    for each item, apart, so that neither takes the other's places: this supplier's documents
-    about the item, and documents about the item that name no supplier (demand, the market). A
-    scope with fewer documents gives those it has. A document in several scopes is kept once.
+    History documents for one analysis. A document qualifies when its header names this
+    supplier and it is dated within `months` before `as_of`. Within that, the `per_scope` most
+    recent documents are kept in each scope:
+    - supplier scope: supplier-wide documents and documents about this supplier's other items;
+    - item scope (one per item in `items`): this supplier's documents about that item.
+    A scope with fewer documents gives those it has. A document in several scopes is kept once.
     Returns (documents, counts) where counts says how many qualified and how many were left out,
     for the report.
-
-    A document that names another supplier is about that supplier's goods, even when it names
-    one of these items (the header rule: supplier and items set = those items from that
-    supplier). It is left out before the limits, so it neither takes an item's place from this
-    supplier's documents nor reaches the analysis, whose prompt reads every document naming a
-    supplier and items as this supplier's.
     """
-    keys = [f"s:{history_key(supplier)}"] if history_key(supplier) else []
-    for code, name in items:
-        keys += [f"i:{history_key(v)}" for v in (code, name) if history_key(v)]
-    keys = list(dict.fromkeys(keys))
+    own = history_key(supplier)
     counts = {"window_months": months, "from": _months_before(as_of, months), "to": as_of[:10],
               "per_scope": per_scope, "matched": 0, "in_window": 0, "included": 0, "left_out": 0}
-    if not keys:
+    if not own:
         return [], counts
-    where = {keys[0]: True} if len(keys) == 1 else {"$or": [{k_: True} for k_ in keys]}
-    raw = history_collection().get(where=where, include=["metadatas", "documents"])
+    raw = history_collection().get(where={f"s:{own}": True}, include=["metadatas", "documents"])
 
     # one entry per document
     docs: dict[tuple, dict[str, Any]] = {}
@@ -312,21 +301,16 @@ def search_history(supplier: str, items: list[tuple[str, str]], as_of: str,
                      "date": m.get("event_date") or "", "source": m.get("source") or "",
                      "_sort": _doc_date(m), "_keys": {k_ for k_ in m if k_.startswith("i:")},
                      "text": text}
-    # another supplier's documents about these items are not about this order (docstring)
-    own = history_key(supplier)
-    docs = {k: d for k, d in docs.items() if not d["supplier"] or history_key(d["supplier"]) == own}
     counts["matched"] = len(docs)
     start, end = counts["from"], counts["to"]
     pool = sorted((d for d in docs.values() if start < d["_sort"] <= end), key=lambda d: d["_sort"], reverse=True)
     counts["in_window"] = len(pool)
 
     item_keys = [{f"i:{history_key(v)}" for v in (code, name) if history_key(v)} for code, name in items]
-    scopes = [[d for d in pool if not (d["_keys"] & set().union(*item_keys)) and history_key(d["supplier"]) == own]]
-    # two scopes of their own for each item: this supplier's documents about it, and documents
-    # about it that name no supplier
+    all_item_keys = set().union(*item_keys) if item_keys else set()
+    scopes = [[d for d in pool if not (d["_keys"] & all_item_keys)]]
     for ik in item_keys:
-        scopes += [[d for d in pool if d["_keys"] & ik and d["supplier"]],
-                   [d for d in pool if d["_keys"] & ik and not d["supplier"]]]
+        scopes.append([d for d in pool if d["_keys"] & ik])
     chosen: list[dict[str, Any]] = []
     for scope in scopes:
         for d in scope[:per_scope]:

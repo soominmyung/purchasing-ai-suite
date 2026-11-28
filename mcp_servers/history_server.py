@@ -27,11 +27,11 @@ from services.vector_store import history_collection, search_history
 mcp = MCPServer(
     name="purchasing-history",
     instructions=(
-        "Purchasing history for purchasing decisions. Each record says which supplier and "
-        "items it is about: supplier-wide (e.g. a strike), a supplier's particular items "
-        "(e.g. a defective lot), or items whoever supplies them (e.g. a demand spike). Look "
-        "up a supplier before raising a purchase order. Browse the suppliers:// and items:// "
-        "resources first if you do not know the exact name."
+        "Purchasing history for purchasing decisions. Every record belongs to a supplier and "
+        "applies either supplier-wide (e.g. a strike or line refit) or to specific items from "
+        "that supplier (e.g. a defective lot or SKU demand surge). Look up a supplier before "
+        "raising a purchase order. Browse the suppliers:// and items:// resources first if you "
+        "do not know the exact name."
     ),
 )
 
@@ -60,13 +60,13 @@ def _render(docs: list[dict], empty: str) -> str:
 def purchasing_history(supplier_name: str = "", item_names: list[str] | None = None,
                        item_codes: list[str] | None = None, as_of: str = "", limit: int = 5) -> str:
     items = [("", n) for n in (item_names or [])] + [(c, "") for c in (item_codes or [])]
-    if not supplier_name and not items:
-        return "Give a supplier name, item names or item codes."
+    if not supplier_name:
+        return "Give a supplier name (and optionally item names or item codes)."
     from datetime import date
     from config import settings
     docs, _ = search_history(supplier_name, items, as_of=as_of or date.today().isoformat(),
                              months=settings.history_window_months, per_scope=limit)
-    return _render(docs, "No history on record for that supplier or those items.")
+    return _render(docs, "No history on record for that supplier.")
 
 
 def _distinct(field: str) -> list[str]:

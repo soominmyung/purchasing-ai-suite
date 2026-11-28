@@ -38,7 +38,7 @@ questions, actions, summary) uses these new figures, not the input's.
     }
   ],
   "history": [
-    { "id": 1, "supplier": "SupplierName" | "", "items": ["ItemName", ...], "item_codes": ["100000", ...], "date": "YYYY-MM-DD" | "", "text": "..." }
+    { "id": 1, "supplier": "SupplierName", "items": ["ItemName", ...], "item_codes": ["100000", ...], "date": "YYYY-MM-DD" | "", "text": "..." }
   ]
 }
 
@@ -58,11 +58,10 @@ STOCK POSITION
 - Rows with missing or invalid figures were removed before you see the items.
 
 HISTORY
-"history" lists the most recent documents on file about this supplier or about these items.
+"history" lists the most recent documents on file for this supplier (supplier-wide and item-specific).
 Each document applies only to what it names:
 - supplier set, items empty: the supplier as a whole (a strike, a price change). Its findings have items [].
-- supplier and items set: those items from this supplier (a defective lot). Its findings list those items.
-- items set, supplier empty: those items whoever supplies them (a demand spike). Its findings list those items.
+- supplier and items set: those items from this supplier (a defective lot, a SKU demand surge). Its findings list those items.
 - A document about an item of this supplier that is not in "items" may give a finding about the
   supplier (items []); never a finding about another item.
 - Never attribute a document to an item it does not name. A supplier-wide document that reports a
